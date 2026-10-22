@@ -1,6 +1,6 @@
 # ADR-0003: ESM JavaScript on current Node, no build step
 
-**Status:** proposed, 2026-10-22. Awaiting review by Martin Fracker Jr.
+**Status:** proposed, 2026-10-22. Awaiting review by Towerism, the repository owner.
 
 The package is plain ESM JavaScript with JSDoc types, checked by `tsc --checkJs` and shipped as written. It supports the Node range that semantic-release itself supports.
 
@@ -18,7 +18,7 @@ The package is plain ESM JavaScript with JSDoc types, checked by `tsc --checkJs`
 
 ## Decision
 
-ESM JavaScript with JSDoc. `tsc --noEmit --checkJs` runs in lint. The Node range is copied from `@semantic-release/github` and updated when it changes. The peer dependency is `semantic-release >=24` (to be confirmed against the installed version in the first spike).
+ESM JavaScript with JSDoc. `tsc --noEmit --checkJs` runs in lint. The Node range is copied from `@semantic-release/github` and updated when it changes. The peer dependency is `semantic-release >=24.1.0`, the range the GitHub plugin uses. The Node range excludes Node 20 on purpose, which `@forge-for-gitea/semantic-release-gitea` still supports; semantic-release 25 does not run on it.
 
 ## Consequences
 

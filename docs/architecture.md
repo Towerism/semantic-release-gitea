@@ -24,7 +24,8 @@ lib/
   success.js        finds pull requests and issues in the release and comments on them
   fail.js           opens or updates the "release is failing" issue
   client.js         the only module that calls fetch: auth header, retry, errors, pagination
-  repo-url.js       turns the repository URL (https or scp-style ssh) into owner and repo
+  repo-url.js       turns the repository URL into owner and repo (see Open questions for sub-path hosts)
+  labels.js         resolves label names to Gitea's numeric IDs and creates missing labels
   definitions/      error codes and messages, constants
 ```
 
@@ -38,9 +39,9 @@ lib/
 | `publish` | Creates the release. With assets: creates a draft, uploads each asset, then sets `draft: false`. | `POST /repos/{owner}/{repo}/releases`, `POST …/releases/{id}/assets?name=`, `PATCH …/releases/{id}` |
 | `addChannel` | Updates the existing release for a tag (pre-release flag, name), or creates it when none exists. | `GET …/releases/tags/{tag}`, `PATCH …/releases/{id}`, `POST …/releases` |
 | `success` | Finds pull requests that contain the released commits, and issues they or the commit messages close. Comments and labels each one. | `GET …/commits/{sha}/pull`, `GET …/pulls/{n}/commits`, `POST …/issues/{n}/comments`, `POST …/issues/{n}/labels`, `GET`/`POST …/labels` |
-| `fail` | Finds the open failure issue by label and hidden marker. Comments on it, or opens one. | `GET …/issues?state=open&type=issues&labels=`, `POST …/issues`, `POST …/issues/{n}/comments` |
+| `fail` | Finds the open failure issue by label and hidden marker. Comments on it, or opens one. Labels are resolved to numeric IDs first, creating missing ones with a colour. | `GET`/`POST …/labels`, `GET …/issues?state=open&type=issues&labels=`, `POST …/issues`, `POST …/issues/{n}/comments` |
 
-All endpoint shapes above come from memory of the Gitea API and from the two existing plugins. They are not yet checked against the target server. Verifying them is the first piece of work (see [Open questions](#open-questions)).
+All endpoint shapes above come from memory of the Gitea API and from the two existing plugins. They are not yet checked against the target server. Verifying them is the first piece of work (see [Open questions](#open-questions)). Three behaviors are most at risk: whether `labels` on issue create takes IDs rather than names, whether the per-commit pull request endpoint covers merge-commit and rebase merges, and whether a draft release can be fetched by tag.
 
 ### Configuration
 
@@ -49,7 +50,7 @@ Options keep the GitHub plugin's names where Gitea has an equivalent: `assets`, 
 | Setting | Source | Notes |
 |---|---|---|
 | Token | `GITEA_TOKEN` env var | Required. Sent as `Authorization: token <value>`. Never read from plugin options, so it cannot end up in a committed config file. |
-| Server URL | `giteaUrl` option, else `GITEA_URL` env var | Required. Example: `https://vcs.martinfrackerjr.com`. No default, because there is no canonical Gitea host. |
+| Server URL | `giteaUrl` option, else `GITEA_URL` env var | Required. Example: `https://vcs.martinfrackerjr.com`. No default, because there is no canonical Gitea host. `giteaApiUrl` overrides the whole API base and has no env var. |
 | API prefix | `giteaApiPrefix` option, else `GITEA_PREFIX` env var | Default `/api/v1`. |
 | Owner and repo | Parsed from `options.repositoryUrl` | Handles `https://host/owner/repo.git` and `git@host:owner/repo.git`. Checked against `clone_url` to catch renames. |
 
@@ -83,14 +84,17 @@ Four constraints shaped the design.
 
 - `success` costs one request per released commit plus one per candidate pull request. A release of 200 commits makes a few hundred calls. That is acceptable for a release job that runs once, and the in-flight limit keeps it from flooding a small self-hosted server. A cache by pull-request number avoids repeat lookups.
 - Targeting Gitea's current stable release means older servers may lack `GET /commits/{sha}/pull` (added in 1.16, from memory). Verify reads `GET /version` and reports a clear error below the supported minimum, which is set after the first server check.
-- Squash and rebase merges break the link from a pull request to its commits. The GitHub plugin has the same limit and handles it with the merge-commit check. We copy that fallback.
+- On GitHub, a pull request can be linked to its commits by several routes. On Gitea, the per-commit endpoint probably maps only the commit the merge recorded, so squash merges work best, and merge-commit and rebase merges may miss pull requests. A `(#N)` reference in the commit subject is a second source (ADR-0005). Coverage is unverified.
 
 ## Open questions
 
-1. What Gitea version does `vcs.martinfrackerjr.com` run, and does it accept the endpoints in the table above? Anonymous calls return `403 Only signed in user is allowed to call APIs`, so a token is needed. Whoever has the server needs to create one with `write:repository` and `write:issue` scopes, on a throwaway repository.
+1. What Gitea version does `vcs.martinfrackerjr.com` run, and does it accept the endpoints in the table above? An anonymous `curl` of `/api/v1/version` on 2026-10-22 returned `403 Only signed in user is allowed to call APIs`, so a token is needed. Whoever has the server needs to create one with `write:repository` and `write:issue` scopes, on a throwaway repository.
 2. Package name: ADR-0007 proposes the unscoped `semantic-release-gitea`, free on npm on 2026-10-22. The repository is `Towerism/semantic-release-gitea` on GitHub, and the plugin releases itself with semantic-release.
 3. Licence: MIT, to match the code this design follows and to allow reuse of its logic with attribution.
-4. Does the "Do not check permissions under CI" exception need a Gitea Actions equivalent? Decide after testing a token issued by an Actions runner.
+4. Does the "Do not check permissions under CI" exception need a Gitea Actions equivalent? Decide after testing a token issued by an Actions runner. Also check how the built-in token is named there (ADR-0004).
+5. Repository URLs on a Gitea server installed under a sub-path (`https://host/gitea/owner/repo`) or in the form `ssh://git@host:2222/owner/repo.git` cannot be parsed by the GitHub plugin's rules. Derive the base from `giteaUrl` when set, and test both forms.
+6. The personal server's hostname appears in this public repository because the owner named it as the test server. Confirm they want it to stay.
+7. Does `verifyConditions` copy options from a `publish` plugin entry, as the GitHub plugin does? Decide whether to keep that, since it matters when a user lists the plugin twice.
 
 ## Related
 

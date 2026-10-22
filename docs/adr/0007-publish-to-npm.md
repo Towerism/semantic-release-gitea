@@ -1,6 +1,6 @@
 # ADR-0007: Publish to npm from GitHub Actions with semantic-release
 
-**Status:** proposed, 2026-10-22. Awaiting review by Towerism (the repository owner).
+**Status:** proposed, 2026-10-22. Awaiting review by Towerism, the repository owner.
 
 The package is published to the public npm registry as `semantic-release-gitea`. A GitHub Actions workflow on the `main` branch of `Towerism/semantic-release-gitea` runs semantic-release, which versions, tags, publishes to npm and creates the GitHub release.
 
@@ -23,7 +23,7 @@ Use the unscoped name `semantic-release-gitea`. The first publish is done once b
 
 ## Consequences
 
-Releases need no human once the workflow exists. The package ships only `index.js`, `lib/` and `index.d.ts` (set in `files`), plus the licence and README. The `engines` and peer dependency ranges in ADR-0003 become a public contract: raising the minimum Node version is a breaking change. The workflow needs `contents: write` and `id-token: write` permissions, and nothing else.
+Releases need no human once the workflow exists. The package ships only `index.js`, `lib/` and `index.d.ts` (set in `files`), plus the licence and README. The `engines` and peer dependency ranges in ADR-0003 become a public contract: raising the minimum Node version is a breaking change. The workflow needs `contents: write` (tags and releases), `id-token: write` (npm trusted publishing), and `issues: write` and `pull-requests: write` (the success comments and failure issues that `@semantic-release/github` posts).
 
 ## Revisit when
 

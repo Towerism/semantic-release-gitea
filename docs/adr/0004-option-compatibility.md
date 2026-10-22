@@ -1,6 +1,6 @@
 # ADR-0004: Match the GitHub plugin's options, reject the unsupported ones
 
-**Status:** proposed, 2026-10-22. Awaiting review by Martin Fracker Jr.
+**Status:** proposed, 2026-10-22. Awaiting review by Towerism, the repository owner.
 
 Option names, defaults and error shapes follow `@semantic-release/github` where Gitea has an equivalent. An option Gitea cannot honor makes verification fail, rather than being ignored.
 
@@ -22,7 +22,7 @@ Same names and defaults, with `giteaUrl`, `giteaApiUrl` (full override) and `git
 
 ## Consequences
 
-The GitHub plugin's README is a usable guide for most options. We document the differences in one table. We do not read `GH_TOKEN` or `GITHUB_TOKEN`, so a leftover GitHub token is never sent to a Gitea server.
+The GitHub plugin's README is a usable guide for most options. We document the differences in one table. We do not read `GH_TOKEN` or `GITHUB_TOKEN`, so a leftover GitHub token is never sent to a Gitea server. Under Gitea Actions the built-in credential is exposed as `GITHUB_TOKEN`, and Gitea reserves secret names that start with `GITEA_` or `GITHUB_` (both from memory, unverified). The README must show the mapping, `env: GITEA_TOKEN: ${{ secrets.RELEASE_TOKEN }}` or `${{ gitea.token }}`, and the first spike must check which works.
 
 ## Revisit when
 

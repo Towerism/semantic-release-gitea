@@ -1,6 +1,6 @@
 # ADR-0001: Build a new plugin
 
-**Status:** proposed, 2026-10-22. Awaiting review by Martin Fracker Jr.
+**Status:** proposed, 2026-10-22. Awaiting review by Towerism, the repository owner.
 
 We write a new semantic-release plugin for Gitea, following the structure of `@semantic-release/github`, instead of adopting or forking an existing Gitea plugin.
 
@@ -8,7 +8,7 @@ We write a new semantic-release plugin for Gitea, following the structure of `@s
 
 Two Gitea plugins are on npm. I read the source of both.
 
-- `@saithodev/semantic-release-gitea` 2.1.0: CommonJS, targets Node 10 to 14 and later, last published April 2022. It has verify, publish and addChannel. No success or fail step.
+- `@saithodev/semantic-release-gitea` 2.1.0: CommonJS, targets Node 10 to 14 and later, last release 2021 (the 2.1.0 changelog entry is dated 2021-04-08). It has verify, publish and addChannel. No success or fail step.
 - `@forge-for-gitea/semantic-release-gitea` 1.2.0: an ES module, published September 2025, uses the `gitea-js` client library. It has verify and publish only.
 
 The goal is parity with the GitHub plugin, including the success comments and the failure issue. Neither plugin has those.
