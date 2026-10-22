@@ -1,6 +1,6 @@
 # ADR-0003: ESM JavaScript on current Node, no build step
 
-**Status:** proposed, 2026-10-22. Awaiting review by Towerism, the repository owner.
+**Status:** accepted, 2026-10-22, by Towerism, the repository owner ("approve architecture and all ADRs").
 
 The package is plain ESM JavaScript with JSDoc types, checked by `tsc --checkJs` and shipped as written. It supports the Node range that semantic-release itself supports.
 

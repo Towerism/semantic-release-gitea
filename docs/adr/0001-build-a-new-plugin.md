@@ -1,6 +1,6 @@
 # ADR-0001: Build a new plugin
 
-**Status:** proposed, 2026-10-22. Awaiting review by Towerism, the repository owner.
+**Status:** accepted, 2026-10-22, by Towerism, the repository owner ("approve architecture and all ADRs").
 
 We write a new semantic-release plugin for Gitea, following the structure of `@semantic-release/github`, instead of adopting or forking an existing Gitea plugin.
 

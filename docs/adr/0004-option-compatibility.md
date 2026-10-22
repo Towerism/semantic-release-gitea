@@ -1,6 +1,6 @@
 # ADR-0004: Match the GitHub plugin's options, reject the unsupported ones
 
-**Status:** proposed, 2026-10-22. Awaiting review by Towerism, the repository owner.
+**Status:** accepted, 2026-10-22, by Towerism, the repository owner ("approve architecture and all ADRs").
 
 Option names, defaults and error shapes follow `@semantic-release/github` where Gitea has an equivalent. An option Gitea cannot honor makes verification fail, rather than being ignored.
 

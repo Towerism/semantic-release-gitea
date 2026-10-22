@@ -1,6 +1,6 @@
 # Architecture of semantic-release-gitea
 
-**Status:** proposed, 2026-10-22. Not yet reviewed. Once reviewed, this document and the ADRs in `adr/` are the source of truth, and a departure needs a new or updated ADR.
+**Status:** accepted, 2026-10-22, by Towerism, the repository owner ("approve architecture and all ADRs"). This document and the ADRs in `adr/` are the source of truth, and a departure needs a new or updated ADR.
 
 This document is for the maintainer who will build the plugin and for anyone who later asks why it works the way it does. It describes a semantic-release plugin that does for a Gitea server what `@semantic-release/github` 12.0.10 does for GitHub: publish a release, and comment on or open issues and pull requests.
 

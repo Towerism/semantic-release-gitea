@@ -1,6 +1,6 @@
 # ADR-0006: Test with fakes by default and a live Gitea on demand
 
-**Status:** proposed, 2026-10-22. Awaiting review by Towerism, the repository owner.
+**Status:** accepted, 2026-10-22, by Towerism, the repository owner ("approve architecture and all ADRs").
 
 Tests run in two layers. The default layer needs no network. An opt-in layer runs the real plugin against a Gitea server and a throwaway repository.
 

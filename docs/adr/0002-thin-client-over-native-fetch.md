@@ -1,6 +1,6 @@
 # ADR-0002: Use a thin client over native fetch
 
-**Status:** proposed, 2026-10-22. Awaiting review by Towerism, the repository owner.
+**Status:** accepted, 2026-10-22, by Towerism, the repository owner ("approve architecture and all ADRs").
 
 All Gitea calls go through one module, `lib/client.js`, built on Node's global `fetch`. We add no HTTP or SDK dependency.
 

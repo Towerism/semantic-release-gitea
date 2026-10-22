@@ -1,6 +1,6 @@
 # ADR-0005: Find pull requests with per-commit REST calls
 
-**Status:** proposed, 2026-10-22. Awaiting review by Towerism, the repository owner.
+**Status:** accepted, 2026-10-22, by Towerism, the repository owner ("approve architecture and all ADRs").
 
 The `success` step finds pull requests with `GET /repos/{owner}/{repo}/commits/{sha}/pull` for each released commit, with at most a fixed number of requests in flight.
 

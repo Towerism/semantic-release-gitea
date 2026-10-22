@@ -1,6 +1,6 @@
 # ADR-0007: Publish to npm from GitHub Actions with semantic-release
 
-**Status:** proposed, 2026-10-22. Awaiting review by Towerism, the repository owner.
+**Status:** accepted, 2026-10-22, by Towerism, the repository owner ("approve architecture and all ADRs").
 
 The package is published to the public npm registry as `semantic-release-gitea`. A GitHub Actions workflow on the `main` branch of `Towerism/semantic-release-gitea` runs semantic-release, which versions, tags, publishes to npm and creates the GitHub release.
 
