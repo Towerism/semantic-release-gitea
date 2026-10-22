@@ -6,7 +6,7 @@ Tests run in two layers. The default layer needs no network. An opt-in layer run
 
 ## Context
 
-Mocks record what we believe Gitea does. Our personal server, `vcs.martinfrackerjr.com`, is available for testing, but it requires a signed-in token even for read calls, and the repository is public on GitHub. The owner said the server "can be used for testing"; the dedicated test user and token below are this ADR's assumption and need the owner's confirmation.
+Mocks record what we believe Gitea does. Our personal server, `vcs.martinfrackerjr.com`, is available for testing, but it requires a signed-in token even for read calls, and the repository is public on GitHub. The owner confirmed on 2026-10-22 that a dedicated test user named `testing` exists on the server, with a scoped token.
 
 ## Options
 

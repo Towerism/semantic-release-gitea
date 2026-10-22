@@ -93,7 +93,7 @@ Four constraints shaped the design.
 3. Licence: MIT, to match the code this design follows and to allow reuse of its logic with attribution.
 4. Does the "Do not check permissions under CI" exception need a Gitea Actions equivalent? Decide after testing a token issued by an Actions runner. Also check how the built-in token is named there (ADR-0004).
 5. Repository URLs on a Gitea server installed under a sub-path (`https://host/gitea/owner/repo`) or in the form `ssh://git@host:2222/owner/repo.git` cannot be parsed by the GitHub plugin's rules. Derive the base from `giteaUrl` when set, and test both forms.
-6. The personal server's hostname appears in this public repository because the owner named it as the test server. Confirm they want it to stay.
+6. Settled 2026-10-22: the owner agreed the personal server's hostname may stay in this public repository.
 7. Does `verifyConditions` copy options from a `publish` plugin entry, as the GitHub plugin does? Decide whether to keep that, since it matters when a user lists the plugin twice.
 
 ## Related
