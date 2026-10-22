@@ -39,6 +39,15 @@ test('removes the hostname from URLs, headers and network errors', () => {
   assert.ok(!out.includes(HOST));
 });
 
+test('removes the host of any URL, since the server may report a different public name', () => {
+  const out = text({
+    clone_url: 'https://git.other.example:8443/testing/r.git',
+    ssh_url: 'ssh://git@git.other.example:2222/testing/r.git',
+  });
+  assert.ok(!out.includes('other.example'));
+  assert.ok(out.includes('/testing/r.git'));
+});
+
 test('removes emails and avatar URLs', () => {
   const out = text({ owner: user(), commit: { author: { email: 'a.b@example.org' } } });
   assert.ok(!out.includes('@'));

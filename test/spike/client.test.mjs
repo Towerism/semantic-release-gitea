@@ -92,3 +92,13 @@ test('sends a JSON body with a content-type', async () => {
   assert.equal(out.status, 201);
   assert.equal(body, '{"name":"x"}');
 });
+
+test('scrubs the body by default and returns it as received only for internal decisions', async () => {
+  const srv = await fakeServer((req, res) => json(res, 200, [{ name: 'r', owner: { login: 'testing', id: 7 } }]));
+  const client = createClient({ baseUrl: srv.url, token: TOKEN });
+  const scrubbed = await client.request('GET', '/user/repos');
+  const internal = await client.request('GET', '/user/repos', { internal: true });
+  await srv.close();
+  assert.equal(scrubbed.body[0].owner.login, undefined);
+  assert.equal(internal.body[0].owner.login, 'testing');
+});

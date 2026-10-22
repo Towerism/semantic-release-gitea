@@ -18,6 +18,7 @@ export function makeScrubber({ token, host }) {
     if (token) out = out.split(token).join('<token>');
     if (hostPattern) out = out.replace(hostPattern, '<host>');
     return out
+      .replace(/\b(https?|ssh):\/\/[^/\s"'<>]+/gi, '$1://<host>')
       .replace(/https?:\/\/\S*avatar\S*/gi, '<avatar-url>')
       .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, '<email>');
   }

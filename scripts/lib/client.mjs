@@ -18,7 +18,9 @@ export function createClient({
   const scrub = makeScrubber({ token, host });
   const origin = new URL(baseUrl).origin;
 
-  async function request(method, path, { json, body, headers = {} } = {}) {
+  // internal: true returns the body as received, for decisions the script makes
+  // itself (who owns a repository). Such a body must never be recorded.
+  async function request(method, path, { json, body, headers = {}, internal = false } = {}) {
     if (!path.startsWith('/')) throw new Error('path must be relative to the API root and start with /');
     const init = {
       method,
@@ -49,7 +51,7 @@ export function createClient({
       status: response.status,
       redirected: response.status >= 300 && response.status < 400,
       headers: filterHeaders(response.headers),
-      body: scrub(parsed),
+      body: internal ? parsed : scrub(parsed),
     };
   }
 
