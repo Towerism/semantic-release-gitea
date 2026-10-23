@@ -22,7 +22,7 @@ Same names and defaults, with `giteaUrl`, `giteaApiUrl` (full override) and `git
 
 ## Consequences
 
-The GitHub plugin's README is a usable guide for most options. We document the differences in one table. We do not read `GH_TOKEN` or `GITHUB_TOKEN`, so a leftover GitHub token is never sent to a Gitea server. Under Gitea Actions the built-in credential is exposed as `GITHUB_TOKEN`, and Gitea reserves secret and variable names that start with `GITEA_` or `GITHUB_` (confirmed on Gitea 28.2.0: the API returns 400, see [the verification record](../gitea-api-verification.md#10-gitea-actions)). That the built-in credential is exposed as `GITHUB_TOKEN` was not checked: the server has no Actions runner. The README must show the mapping, `env: GITEA_TOKEN: ${{ secrets.RELEASE_TOKEN }}` or `${{ gitea.token }}`, and a later run on a server with a runner must check which works.
+The GitHub plugin's README is a usable guide for most options. We document the differences in one table. We do not read `GH_TOKEN` or `GITHUB_TOKEN`, so a leftover GitHub token is never sent to a Gitea server. Under Gitea Actions the built-in credential is exposed as `GITHUB_TOKEN`, and Gitea reserves secret and variable names that start with `GITEA_` or `GITHUB_` (confirmed on Gitea 28.2.0: the API returns 400, see [the verification record](../gitea-api-verification.md#10-gitea-actions)). The built-in credential is not an environment variable under Gitea Actions. A workflow reads it as `${{ secrets.GITHUB_TOKEN }}`, `${{ gitea.token }}` or `${{ github.token }}` (confirmed on 28.2.0). The README must show the mapping, `env: GITEA_TOKEN: ${{ secrets.RELEASE_TOKEN }}` or `${{ gitea.token }}`.
 
 ## Revisit when
 

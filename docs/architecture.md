@@ -77,7 +77,7 @@ Four constraints shaped the design.
 | `discussionCategoryName` | Rejected by verify with `EUNSUPPORTEDOPTION` | Gitea has no release discussions. |
 | GraphQL for associated PRs and for finding failure issues | REST calls, with a bounded number in flight at once | No GraphQL in Gitea. |
 | Octokit retry and throttling plugins | Small retry on network errors, 429 and 5xx, honoring `Retry-After` | A normal response on the tested server had no `Retry-After` or `X-RateLimit-*` header. A 429 was not provoked, so the retry path is untested against a real server. |
-| Permission check skipped under GitHub Actions | Always checks `permissions.push` | Not covered: no runner is registered on the tested server, so a runner token's `permissions` was not observed ([check 10](gitea-api-verification.md#10-gitea-actions)). Always checking is the safe default. |
+| Permission check skipped under GitHub Actions | Always checks `permissions.push` | Confirmed: a workflow's built-in token gets `permissions` of `push: true` on a repository owned by the `testing` user ([check 10](gitea-api-verification.md#10-gitea-actions)). Always checking works under Actions. |
 | `issue-parser` `github` preset | Same preset with `hosts: [giteaUrl]` | `#N`, `owner/repo#N` and `/issues/N` URLs parse. Gitea pull request URLs (`/pulls/N`) are not read by the preset, so the plugin does not rely on them ([check 8](gitea-api-verification.md#8-issue-parser-with-the-github-preset)). |
 
 ## Trade-offs and limits
@@ -91,7 +91,7 @@ Four constraints shaped the design.
 1. Answered 2026-10-22: the server runs Gitea 28.2.0 and accepts the endpoints in the table above ([verification record](gitea-api-verification.md)). Whether older versions do is still untested.
 2. Package name: ADR-0007 proposes the unscoped `semantic-release-gitea`, free on npm on 2026-10-22. The repository is `Towerism/semantic-release-gitea` on GitHub, and the plugin releases itself with semantic-release.
 3. Licence: MIT, to match the code this design follows and to allow reuse of its logic with attribution.
-4. Does the "Do not check permissions under CI" exception need a Gitea Actions equivalent? Not covered by the spike: the server has no runner registered. Register one, run the workflow described under [check 10](gitea-api-verification.md#10-gitea-actions), then decide. That run also shows how the built-in token is named (ADR-0004).
+4. Does the "Do not check permissions under CI" exception need a Gitea Actions equivalent? Answered 2026-10-22: no exception is needed. The built-in token returns `permissions` (check 10). It is available as `secrets.GITHUB_TOKEN`, `gitea.token` and `github.token`, and is not set as an environment variable by default (ADR-0004).
 5. Repository URLs on a server installed under a sub-path (`https://host/gitea/owner/repo`) are parsed wrongly by the GitHub plugin's rules; the `ssh://git@host:2222/owner/repo.git` form parses correctly ([check 11](gitea-api-verification.md#11-repository-url-forms)). Derive the base from `giteaUrl` when set, and test the sub-path form in the plugin's own tests.
 6. Settled 2026-10-22: the owner agreed the personal server's hostname may stay in this public repository.
 7. Does `verifyConditions` copy options from a `publish` plugin entry, as the GitHub plugin does? Decide whether to keep that, since it matters when a user lists the plugin twice.
