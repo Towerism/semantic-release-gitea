@@ -73,6 +73,15 @@ test('publish and addChannel release to a throwaway repository on a real Gitea s
     assert.equal(withFile.body.draft, false);
     assert.deepEqual(withFile.body.assets.map((/** @type {{ name: string }} */ asset) => asset.name), ['asset.txt']);
 
+    // As in a real run, semantic-release has already pushed the tag when publish starts.
+    const tag = await api('POST', `${repoPath}/tags`, { tag_name: 'v1.3.0', target: 'main' });
+    assert.equal(tag.status, 201, 'the tag should be created before publish');
+    await plugin.publish({ assets: ['asset.txt'] }, release('v1.3.0'));
+    const tagged = await api('GET', `${repoPath}/releases/tags/v1.3.0`);
+    assert.equal(tagged.body.tag_name, 'v1.3.0');
+    assert.equal(tagged.body.draft, false);
+    assert.deepEqual(tagged.body.assets.map((/** @type {{ name: string }} */ asset) => asset.name), ['asset.txt']);
+
     // addChannel changes an existing release...
     await plugin.addChannel({}, release('v1.0.0', { name: 'next', type: 'prerelease', main: false, prerelease: 'next' }));
     const moved = await api('GET', `${repoPath}/releases/tags/v1.0.0`);
