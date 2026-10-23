@@ -31,8 +31,11 @@ test('repository metadata points at the GitHub repository, without provenance se
   assert.deepEqual(pkg.publishConfig, { access: 'public' });
 });
 
-test('there are no runtime dependencies and every dev dependency is pinned exactly', () => {
-  assert.equal(pkg.dependencies, undefined);
+test('the runtime dependencies are the two error packages, and every dependency is pinned exactly', () => {
+  assert.deepEqual(Object.keys(pkg.dependencies).sort(), ['@semantic-release/error', 'aggregate-error']);
+  for (const [name, version] of Object.entries(pkg.dependencies)) {
+    assert.match(String(version), /^\d+\.\d+\.\d+$/, `${name} must be pinned to an exact version`);
+  }
   const allowed = [
     '@semantic-release/commit-analyzer',
     '@semantic-release/github',
