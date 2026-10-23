@@ -5,7 +5,9 @@
 
 const USER_KEYS = new Set(['owner', 'user', 'poster', 'author', 'merged_by', 'assignee', 'assignees']);
 const USER_FIELDS = ['id', 'login', 'username', 'full_name'];
-const DROPPED_KEYS = new Set(['email', 'avatar_url', 'user_id', 'uid', 'owner_id']);
+const DROPPED_KEYS = new Set(['email', 'avatar_url']);
+// Keys that hold a user's ID. Other *_id keys (milestone_id, release_id) stay.
+const USER_ID_KEY = /^(uid|(user|owner|poster|creator|merger|author|original_author|assignee|actor|doer|reviewer|pusher)_id)$/;
 const HEADER_ALLOWLIST = [/^retry-after$/, /^content-type$/, /^x-ratelimit-/];
 
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -36,7 +38,7 @@ export function makeScrubber({ token, host }) {
     if (Array.isArray(value)) return value.map((item) => walk(item, inUser, seen));
     const out = {};
     for (const [key, child] of Object.entries(value)) {
-      if (DROPPED_KEYS.has(key)) continue;
+      if (DROPPED_KEYS.has(key) || USER_ID_KEY.test(key)) continue;
       if (inUser && USER_FIELDS.includes(key)) continue;
       out[key] = walk(child, USER_KEYS.has(key), seen);
     }

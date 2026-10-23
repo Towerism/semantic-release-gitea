@@ -129,3 +129,17 @@ test('keeps only allowlisted headers', () => {
     'x-ratelimit-remaining': '9',
   });
 });
+
+test('removes user ID keys but keeps other IDs', () => {
+  const out = scrub({
+    poster_id: 5,
+    original_author_id: 6,
+    merger_id: 7,
+    creator_id: 8,
+    uid: 9,
+    milestone_id: 11,
+    release_id: 12,
+    id: 13,
+  });
+  assert.deepEqual(out, { milestone_id: 11, release_id: 12, id: 13 });
+});

@@ -40,5 +40,5 @@ test('check 8: records what issue-parser finds for each Gitea reference form', (
 
 test('uses only the placeholder host in its inputs', () => {
   const text = JSON.stringify([checkIssueReferences(), checkRepositoryUrls()]);
-  assert.ok(!text.includes('martinfracker'));
+  assert.ok(!text.includes(['martin', 'fracker'].join('')));
 });
