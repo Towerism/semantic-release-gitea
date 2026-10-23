@@ -155,6 +155,53 @@ test('a request that times out is retried, then fails with status 0 and the orig
   assert.deepEqual(waits, [500, 1000, 2000]);
 });
 
+/**
+ * A fetch the test answers by hand. It rejects when its request is aborted, as the real one
+ * does, and holds a timer so Node stays running while it waits.
+ */
+function manualFetch() {
+  /** @type {AbortSignal | undefined} */
+  let signal;
+  /** @type {(response: Response) => void} */
+  let answer = () => {};
+  const fetch = /** @type {typeof globalThis.fetch} */ (
+    /** @type {unknown} */ (
+      (/** @type {unknown} */ _url, /** @type {RequestInit} */ init) =>
+        new Promise((resolve, reject) => {
+          signal = /** @type {AbortSignal} */ (init.signal);
+          const keepAlive = setTimeout(() => {}, 60_000);
+          answer = (response) => {
+            clearTimeout(keepAlive);
+            resolve(response);
+          };
+          signal.addEventListener('abort', () => {
+            clearTimeout(keepAlive);
+            reject(signal?.reason);
+          });
+        })
+    )
+  );
+  return { fetch, answer: (/** @type {Response} */ response) => answer(response), aborted: () => signal?.aborted };
+}
+
+/** Lets timer ticks pass, longer than the short default limit used below. */
+const pause = (/** @type {number} */ ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+test('a request can set its own time limit, which replaces the default for that call only', async () => {
+  const slow = manualFetch();
+  const { client } = clientFor('http://127.0.0.1:1', { fetch: slow.fetch, timeoutMs: 20 });
+  const pending = client.request('POST', '/upload', { timeoutMs: 10_000 });
+  await pause(100);
+  assert.equal(slow.aborted(), false, 'the longer limit is still running');
+  slow.answer(new Response('{"ok":true}', { status: 201 }));
+  assert.deepEqual(await pending, { ok: true });
+
+  const fast = manualFetch();
+  const { client: other } = clientFor('http://127.0.0.1:1', { fetch: fast.fetch, timeoutMs: 20 });
+  await assert.rejects(other.request('POST', '/upload'), (/** @type {GiteaApiError} */ error) => error.status === 0);
+  assert.equal(fast.aborted(), true, 'without the option the default limit applies');
+});
+
 // --- retries ---------------------------------------------------------------
 
 test('GET and PATCH retry a 503 until the server recovers, but POST does not', () =>
