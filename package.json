@@ -1,11 +1,47 @@
 {
-  "name": "semantic-release-gitea-workspace",
-  "private": true,
+  "name": "semantic-release-gitea",
+  "version": "0.0.0",
+  "description": "A semantic-release plugin that publishes releases and comments on issues and pull requests on a Gitea server",
   "type": "module",
+  "main": "./index.js",
+  "exports": "./index.js",
+  "types": "./index.d.ts",
+  "files": [
+    "index.js",
+    "lib/",
+    "index.d.ts"
+  ],
   "scripts": {
-    "test": "node --test \"test/**/*.test.mjs\""
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "lint": "tsc --noEmit"
+  },
+  "engines": {
+    "node": "^22.14.0 || >= 24.10.0"
+  },
+  "peerDependencies": {
+    "semantic-release": ">=24.1.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Towerism/semantic-release-gitea.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Towerism/semantic-release-gitea/issues"
+  },
+  "homepage": "https://github.com/Towerism/semantic-release-gitea#readme",
+  "publishConfig": {
+    "access": "public"
   },
   "devDependencies": {
-    "issue-parser": "7.0.2"
+    "@semantic-release/commit-analyzer": "13.0.1",
+    "@semantic-release/github": "12.0.10",
+    "@semantic-release/npm": "13.2.0",
+    "@semantic-release/release-notes-generator": "14.1.1",
+    "@types/node": "22.20.5",
+    "issue-parser": "7.0.2",
+    "semantic-release": "25.0.9",
+    "typescript": "7.0.2",
+    "yaml": "2.9.1"
   }
 }
