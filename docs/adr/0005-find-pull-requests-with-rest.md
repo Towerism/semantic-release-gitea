@@ -6,7 +6,7 @@ The `success` step finds pull requests with `GET /repos/{owner}/{repo}/commits/{
 
 ## Context
 
-The GitHub plugin asks one GraphQL query for the pull requests associated with up to 100 commits at a time. Gitea has no GraphQL. It does have the per-commit endpoint. From memory, it looks the pull request up by merged commit ID, so it returns the pull request only for the commit the merge recorded: the merge commit, the squash commit or the last rebased commit. It may not return the pull request for each individual commit inside a merge-commit pull request. All of this is unverified. Issues named in commit messages (`Closes #12`) are found by parsing the messages and need no lookups beyond fetching the issue.
+The GitHub plugin asks one GraphQL query for the pull requests associated with up to 100 commits at a time. Gitea has no GraphQL. It does have the per-commit endpoint. Measured on Gitea 28.2.0 ([record](../gitea-api-verification.md#6-pull-request-lookup-by-commit)), it returns the pull request only for the commit the merge recorded: the merge commit, the squash commit or the last rebased commit. It returns 404 for the other commits inside a merge-commit or rebase pull request, and for every commit on the pull request's own branch. Issues named in commit messages (`Closes #12`) are found by parsing the messages and need no lookups beyond fetching the issue.
 
 ## Options
 
@@ -18,7 +18,7 @@ The GitHub plugin asks one GraphQL query for the pull requests associated with u
 
 ## Decision
 
-Per-commit REST with a limit of 5 requests in flight (configurable later), de-duplicated by pull request number. Pull requests are found from two sources: the per-commit endpoint, and a `(#N)` reference at the end of a commit subject, which squash merges on Gitea add. The GitHub plugin's fallback (keep a pull request if one of its commits, or its merge commit, is in the release) still applies to filter out wrong matches, but on Gitea the risk is missed pull requests, not extra ones. The first spike measures coverage for merge, squash and rebase merges, and this decision is revised with the result. Comments go through `POST /issues/{n}/comments`, because Gitea treats pull requests as issues for comments and labels.
+Per-commit REST with a limit of 5 requests in flight (configurable later), de-duplicated by pull request number. Pull requests are found from two sources: the per-commit endpoint, and a `(#N)` reference at the end of a commit subject, which squash merges on Gitea add. The GitHub plugin's fallback (keep a pull request if one of its commits, or its merge commit, is in the release) still applies to filter out wrong matches, but on Gitea the risk is missed pull requests, not extra ones. The spike measured merge, squash and rebase merges (2026-10-22). Each style finds its pull request through the commit the merge recorded, which is in the release's commit list, so the decision stands. Comments go through `POST /issues/{n}/comments`, because Gitea treats pull requests as issues for comments and labels.
 
 ## Consequences
 
