@@ -1,0 +1,11 @@
+{
+  "name": "semantic-release-gitea-workspace",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"test/**/*.test.mjs\""
+  },
+  "devDependencies": {
+    "issue-parser": "7.0.2"
+  }
+}
