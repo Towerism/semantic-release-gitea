@@ -7,12 +7,13 @@ import { readFile } from 'node:fs/promises';
  */
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 
-test('README names the package, shows a .releaserc example and says the plugin does not work yet', async () => {
+test('README names the package, shows a .releaserc example and says all five steps are built', async () => {
   const readme = await read('README.md');
   assert.match(readme, /semantic-release-gitea/);
   const jsonBlocks = [...readme.matchAll(/```json\n([\s\S]*?)```/g)].map((m) => m[1]);
   assert.ok(jsonBlocks.some((block) => block.includes('"semantic-release-gitea"')), 'expected a .releaserc example');
-  assert.match(readme, /not (yet )?functional|does not work yet/i);
+  assert.match(readme, /all five steps are built/i);
+  assert.doesNotMatch(readme, /not yet functional|not implemented/i);
 });
 
 test('README maintainer notes cover the first publish, the missing tag and the release switch', async () => {
@@ -59,14 +60,60 @@ test('README says which options fail verification, and warns about cleartext htt
   assert.match(readme, /`undici`[\s\S]*EMISSINGPROXYPACKAGE|EMISSINGPROXYPACKAGE[\s\S]*`undici`/);
 });
 
-test('README says which steps are built and that success and fail are not implemented', async () => {
+test('README explains what success does with every option it uses, the template variables and the pull request rules', async () => {
   const readme = await read('README.md');
-  assert.match(readme, /not yet functional/i);
-  assert.match(readme, /`verifyConditions`, `publish` and `addChannel` are built/);
-  for (const step of ['success', 'fail']) {
-    assert.match(readme, new RegExp(`\`${step}\``), `README should name the ${step} step`);
+  const section = readme.slice(readme.search(/^#+ What `success` does$/m), readme.search(/^#+ What `fail` does$/m));
+  assert.ok(section.length > 0 && section.length < readme.length, 'expected a section on success');
+  for (const text of ['successComment', 'successCommentCondition', 'releasedLabels', 'addReleases', 'issue.pull_request', '(#N)', 'issue-parser', '/pulls/', 'failure issue', 'releaseBodyTemplate', 'five requests']) {
+    assert.ok(section.includes(text), `the success section should mention ${text}`);
   }
-  assert.match(readme, /not implemented/i);
+  assert.match(section, /<% return/);
+});
+
+test('README explains what fail does, that it skips the checks of verifyConditions, and what it falls back to', async () => {
+  const readme = await read('README.md');
+  const section = readme.slice(readme.search(/^#+ What `fail` does$/m), readme.search(/^#+ Differences from the GitHub plugin$/m));
+  assert.ok(section.length > 0 && section.length < readme.length, 'expected a section on fail');
+  for (const text of ['failTitle', 'failComment', 'failCommentCondition', 'labels', 'assignees', 'semantic-release:gitea', 'ENOGITEATOKEN', 'ADR-0008', 'default']) {
+    assert.ok(section.includes(text), `the fail section should mention ${text}`);
+  }
+  assert.match(section, /does not run the checks of `verifyConditions`/);
+});
+
+test('README lists the differences from the GitHub plugin', async () => {
+  const readme = await read('README.md');
+  const section = readme.slice(readme.search(/^#+ Differences from the GitHub plugin$/m), readme.search(/^## Environment variables$/m));
+  assert.ok(section.length > 0 && section.length < readme.length, 'expected the differences section');
+  for (const text of ['discussionCategoryName', 'make_latest', '/pulls/', '(#N)', 'releaseBodyTemplate', 'verifyConditions', 'issue.pull_request']) {
+    assert.ok(section.includes(text), `the differences should mention ${text}`);
+  }
+});
+
+test('ADR-0008 records the owner decision that fail skips the full verification', async () => {
+  const adr = await read('docs/adr/0008-fail-without-full-verification.md');
+  assert.match(adr, /^# ADR-0008:/m);
+  assert.ok(adr.includes('("approve ADR-0008")'), 'the status quotes the owner');
+  assert.match(adr, /^\*\*Status:\*\* accepted, 2026-10-22, by Towerism/m);
+  for (const heading of ['Context', 'Options', 'Decision', 'Consequences', 'Revisit when']) {
+    assert.match(adr, new RegExp(`^## ${heading}$`, 'm'), `ADR-0008 should have a ${heading} section`);
+  }
+  for (const option of ['Verify first', 'lighter check', 'No check']) {
+    assert.ok(adr.toLowerCase().includes(option.toLowerCase()), `the options should include ${option}`);
+  }
+});
+
+test('the architecture document lists the new modules, the success and fail endpoints, the differences and ADR-0008', async () => {
+  const architecture = await read('docs/architecture.md');
+  for (const module of ['connect.js', 'failure-issues.js', 'limit.js']) assert.ok(architecture.includes(module), `expected ${module} in the module list`);
+  const successRow = architecture.split('\n').find((line) => line.startsWith('| `success`'));
+  const failRow = architecture.split('\n').find((line) => line.startsWith('| `fail`'));
+  assert.match(String(successRow), /PATCH …\/issues\/\{n\}/);
+  assert.match(String(successRow), /PATCH …\/releases/);
+  assert.match(String(failRow), /GET \/repos\/\{owner\}\/\{repo\}/);
+  assert.match(architecture, /ADR-0008/);
+  assert.match(architecture, /every step but `fail`/);
+  const differences = architecture.slice(architecture.search(/^## Differences from the GitHub plugin$/m), architecture.search(/^## Trade-offs and limits$/m));
+  for (const text of ['`fail`', '`(#N)`', '`releaseBodyTemplate`']) assert.ok(differences.includes(text), `the differences table should mention ${text}`);
 });
 
 test('README explains what publish and addChannel do with the release options and assets', async () => {
