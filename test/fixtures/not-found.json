@@ -1,0 +1,9 @@
+{
+  "source": "synthetic",
+  "giteaVersion": null,
+  "status": 404,
+  "body": {
+    "message": "The target couldn't be found.",
+    "url": "https://gitea.example/api/swagger"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "source": "verification-record",
+  "giteaVersion": "28.2.0",
+  "status": 200,
+  "body": {
+    "clone_url": "https://gitea.example/owner/repo.git",
+    "permissions": {
+      "admin": true,
+      "push": true,
+      "pull": true
+    }
+  }
+}

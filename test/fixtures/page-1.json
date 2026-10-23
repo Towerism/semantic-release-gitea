@@ -1,0 +1,16 @@
+{
+  "source": "synthetic",
+  "giteaVersion": null,
+  "status": 200,
+  "headers": {
+    "link": "<{base}/api/v1/items?page=2>; rel=\"next\", <{base}/api/v1/items?page=3>; rel=\"last\""
+  },
+  "body": [
+    {
+      "id": 1
+    },
+    {
+      "id": 2
+    }
+  ]
+}

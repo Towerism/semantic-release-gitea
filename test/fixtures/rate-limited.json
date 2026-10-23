@@ -1,0 +1,11 @@
+{
+  "source": "synthetic",
+  "giteaVersion": null,
+  "status": 429,
+  "headers": {
+    "retry-after": "2"
+  },
+  "body": {
+    "message": "rate limit exceeded"
+  }
+}

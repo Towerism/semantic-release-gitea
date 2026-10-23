@@ -1,0 +1,9 @@
+{
+  "source": "verification-record",
+  "giteaVersion": "28.2.0",
+  "status": 401,
+  "body": {
+    "message": "invalid username, password or token",
+    "url": "https://gitea.example/api/swagger"
+  }
+}
