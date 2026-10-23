@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { rmSync } from 'node:fs';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -71,12 +72,15 @@ test('draftRelease creates a draft in one request and returns the draft address'
 });
 
 test('a release from a maintenance branch is marked as a pre-release', async () => {
+  const { verified, calls, context } = setup({ context: { branch: { name: '1.x', type: 'release', main: false } } });
+  await publish(verified, context);
+  assert.equal(calls[0].options.json.prerelease, true);
+});
+
+test('a branch that says prerelease: false is never marked as a pre-release', async () => {
   const { verified, calls, context } = setup({ context: { branch: { name: '1.x', type: 'release', main: false, prerelease: false } } });
   await publish(verified, context);
-  assert.equal(calls[0].options.json.prerelease, false, 'prerelease: false on the branch wins');
-  const second = setup({ context: { branch: { name: '1.x', type: 'release', main: false } } });
-  await publish(second.verified, second.context);
-  assert.equal(second.calls[0].options.json.prerelease, true);
+  assert.equal(calls[0].options.json.prerelease, false);
 });
 
 test('the request never carries fields that Gitea does not define', async () => {
@@ -171,6 +175,39 @@ test('an upload that fails stops the step, sends no publish request and names th
   });
   await assert.rejects(publish(verified, context), (/** @type {GiteaApiError} */ error) => error instanceof GiteaApiError && error.status === 500);
   assert.deepEqual(summary(calls), [`POST ${RELEASES}`, `POST ${RELEASES}/7/assets`]);
+  assert.ok(lines.some((line) => line.slice(1).some((value) => String(value).includes(RELEASE_URL))), 'the draft address is logged');
+});
+
+test('a file that cannot be read once the draft exists stops the step and names the draft left behind', async (t) => {
+  const cwd = await folderWithFiles(t);
+  const base = acceptingHandler();
+  const { verified, calls, context, lines } = setup({
+    config: { assets: ['a.txt'] },
+    context: { cwd },
+    handler: (call) => {
+      // The file vanishes after it was checked and before it is read.
+      if (call.method === 'POST' && call.path === RELEASES) rmSync(join(cwd, 'a.txt'));
+      return base(call);
+    },
+  });
+  await assert.rejects(publish(verified, context), /ENOENT/);
+  assert.deepEqual(summary(calls), [`POST ${RELEASES}`]);
+  assert.ok(lines.some((line) => line.slice(1).some((value) => String(value).includes(RELEASE_URL))), 'the draft address is logged');
+});
+
+test('a failed final publish request leaves the uploaded draft and names it', async (t) => {
+  const cwd = await folderWithFiles(t);
+  const base = acceptingHandler();
+  const { verified, calls, context, lines } = setup({
+    config: { assets: ['a.txt'] },
+    context: { cwd },
+    handler: (call) => {
+      if (call.method === 'PATCH') throw new GiteaApiError('server error', { method: 'PATCH', path: call.path, status: 500 });
+      return base(call);
+    },
+  });
+  await assert.rejects(publish(verified, context), (/** @type {GiteaApiError} */ error) => error.status === 500);
+  assert.equal(calls.length, 3);
   assert.ok(lines.some((line) => line.slice(1).some((value) => String(value).includes(RELEASE_URL))), 'the draft address is logged');
 });
 

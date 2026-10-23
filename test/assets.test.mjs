@@ -93,6 +93,26 @@ test('a name template that throws rejects with that error', async (t) => {
   await assert.rejects(prepareAssets(context, [{ path: 'notes.txt', name: '<%= nothing.here %>' }]), /nothing/);
 });
 
+test('an asset name that renders empty or with a slash is rejected before any upload', async (t) => {
+  const { context } = await project(t);
+  context.nextRelease.channel = null;
+  await assert.rejects(prepareAssets(context, [{ path: 'notes.txt', name: '<%= nextRelease.channel %>' }]), /notes\.txt/);
+  await assert.rejects(prepareAssets(context, [{ path: 'notes.txt', name: 'sub/notes.txt' }]), /notes\.txt/);
+});
+
+test('the files of one glob come back sorted by path, whatever order the file system lists them in', async (t) => {
+  const { cwd, context } = await project(t);
+  for (const file of ['dist/m.tgz', 'dist/c.tgz']) await writeFile(join(cwd, file), 'x');
+  const assets = await prepareAssets(context, ['dist/*.tgz']);
+  const paths = relative(assets, cwd);
+  assert.deepEqual(paths, [...paths].sort());
+});
+
+test('an empty group of globs matches nothing', async (t) => {
+  const { context } = await project(t);
+  assert.deepEqual(await prepareAssets(context, [/** @type {any} */ ([])]), []);
+});
+
 test('file names with spaces and non-ASCII characters are kept as written', async (t) => {
   const { cwd, context } = await project(t);
   await writeFile(join(cwd, 'my file ü.txt'), 'x');
