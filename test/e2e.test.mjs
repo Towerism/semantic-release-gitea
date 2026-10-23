@@ -226,13 +226,19 @@ test('all five steps comment on released pull requests and issues and report a f
       existingAndUnknown: await countFor('semantic-release,sr-e2e-unknown'),
       existingAndOtherExisting: await countFor('semantic-release,sr-e2e-label'),
     };
-    const duplicate = await api('POST', `${repoPath}/labels`, { name: 'semantic-release', color: 'ededed' });
-    measured.duplicateLabelCreateStatus = duplicate.status;
-
     await plugin.success(config, context({ commits: [], releases }));
     assert.equal((await failureIssues()).length, 0, 'the next success should close the failure issue');
     const closed = await api('GET', `${repoPath}/issues/${afterSecond[0].number}`);
     assert.equal(closed.body.state, 'closed');
+
+    // Last, because it leaves two labels with one name: what Gitea does when a label is created twice, and what a
+    // listing by that label name then returns for an issue that has one of them.
+    const labelList = await api('GET', `${repoPath}/labels`);
+    const existing = labelList.body.find((/** @type {{ name: string }} */ l) => l.name === 'semantic-release');
+    const probe = await api('POST', `${repoPath}/issues`, { title: 'Probe', labels: [existing.id] });
+    const before = await countFor('semantic-release');
+    const duplicate = await api('POST', `${repoPath}/labels`, { name: 'semantic-release', color: 'ededed' });
+    measured.duplicateLabel = { createStatus: duplicate.status, openIssuesWithTheLabelBefore: before, after: await countFor('semantic-release'), probeStatus: probe.status };
   } finally {
     // Printed even when an assertion above failed, so a failed run still leaves its measurements.
     console.log(`MEASURED ${JSON.stringify(measured)}`);
