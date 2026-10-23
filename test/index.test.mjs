@@ -24,6 +24,8 @@ test('index.d.ts declares the same names as index.js exports, and no others', as
   const declaration = await readFile(new URL('../index.d.ts', import.meta.url), 'utf8');
   const declared = [...declaration.matchAll(/^export function (\w+)\(/gm)].map((m) => m[1]).sort();
   assert.deepEqual(declared, LIFECYCLE);
-  const exportLines = declaration.split('\n').filter((line) => line.startsWith('export'));
-  assert.equal(exportLines.length, LIFECYCLE.length, 'index.d.ts must have no other exports');
+  const valueExports = declaration
+    .split('\n')
+    .filter((line) => line.startsWith('export') && !/^export (interface|type) /.test(line));
+  assert.equal(valueExports.length, LIFECYCLE.length, 'index.d.ts must export no values other than the functions');
 });
