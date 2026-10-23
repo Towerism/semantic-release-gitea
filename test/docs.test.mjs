@@ -59,13 +59,25 @@ test('README says which options fail verification, and warns about cleartext htt
   assert.match(readme, /`undici`[\s\S]*EMISSINGPROXYPACKAGE|EMISSINGPROXYPACKAGE[\s\S]*`undici`/);
 });
 
-test('README still says publish, addChannel, success and fail are not implemented', async () => {
+test('README says which steps are built and that success and fail are not implemented', async () => {
   const readme = await read('README.md');
   assert.match(readme, /not yet functional/i);
-  for (const step of ['publish', 'addChannel', 'success', 'fail']) {
+  assert.match(readme, /`verifyConditions`, `publish` and `addChannel` are built/);
+  for (const step of ['success', 'fail']) {
     assert.match(readme, new RegExp(`\`${step}\``), `README should name the ${step} step`);
   }
   assert.match(readme, /not implemented/i);
+});
+
+test('README explains what publish and addChannel do with the release options and assets', async () => {
+  const readme = await read('README.md');
+  const section = readme.slice(readme.search(/^#+ What `publish` and `addChannel` do$/m));
+  assert.ok(section.length < readme.length, 'expected a section on publish and addChannel');
+  for (const text of ['Gitea release', 'draftRelease', 'releaseNameTemplate', 'releaseBodyTemplate', 'assets', 'attachment']) {
+    assert.ok(section.includes(text), `the section should mention ${text}`);
+  }
+  assert.match(section, /label[\s\S]*ignored|ignored[\s\S]*label/i, 'it should say an asset label is ignored');
+  assert.match(section, /draft/i);
 });
 
 test('the architecture document lists GET /version for verifyConditions and answers open question 7', async () => {
