@@ -44,11 +44,21 @@ function scriptedFetch(/** @type {Array<Error | Response>} */ outcomes) {
   return { fetch: /** @type {typeof globalThis.fetch} */ (/** @type {unknown} */ (fetch)), calls: () => calls };
 }
 
-/** A fetch that never answers but rejects when its request is aborted, as the real one does. */
+/**
+ * A fetch that never answers but rejects when its request is aborted, as the real one does.
+ * A real request holds a socket open, which keeps Node running. AbortSignal.timeout does not
+ * (its timer is unref'd), so this fake holds a timer of its own until the request is aborted.
+ */
 const hangingFetch = /** @type {typeof globalThis.fetch} */ (
   /** @type {unknown} */ (
     (/** @type {unknown} */ _url, /** @type {RequestInit} */ init) =>
-      new Promise((_resolve, reject) => init.signal?.addEventListener('abort', () => reject(init.signal?.reason)))
+      new Promise((_resolve, reject) => {
+        const keepAlive = setTimeout(() => {}, 60_000);
+        init.signal?.addEventListener('abort', () => {
+          clearTimeout(keepAlive);
+          reject(init.signal?.reason);
+        });
+      })
   )
 );
 
