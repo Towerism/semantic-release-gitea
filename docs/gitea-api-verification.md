@@ -7,7 +7,7 @@ This page records what the Gitea API did when the checks in [issue #3](https://g
 - **Minimum supported version:** 28.2.0, the only version tested. One server cannot show that an older version works, and no Gitea release note is cited here for an older one.
 - **Summary:** all 11 checks ran. Three results change the design: issue create takes numeric label IDs only, `issue-parser` ignores `/pulls/N` URLs, and a sub-path install breaks the repository URL parsing.
 
-Gitea version numbers no longer start with `1.`. The architecture's older wording, "added in 1.16", cannot be compared with `28.2.0`, so the version check must compare the numbers it gets and not assume a `1.` prefix.
+This server reports `28.2.0`, not a `1.x` number. The architecture's earlier wording, "added in 1.16", could not be checked against it, and how other Gitea releases are numbered was not checked. Servers older than 28.2.0, or numbered differently, are untested.
 
 ## How the checks ran
 
@@ -58,7 +58,7 @@ Issue create takes numeric IDs only. The plugin must resolve names to IDs first,
 
 ### 5. Issue search
 
-`GET …/issues?state=open&type=issues&labels=<name>` returned 200 with the one matching issue. A search with `q=<marker>` also returned 200 with one match, and fetching the open issues and filtering by the body marker found it. All three methods work on this server. The `q` parameter can be ignored by a server without a search indexer, so the plugin should fetch and filter.
+`GET …/issues?state=open&type=issues&labels=<name>` returned 200 with the one matching issue. A search with `q=<marker>` also returned 200 with one match, and fetching the open issues and filtering by the body marker found it. All three methods work on this server. Fetching the open issues and filtering by the marker is the method that does not depend on the server's search setup; the `q` parameter was not tested on a server without a search indexer.
 
 ### 6. Pull request lookup by commit
 
@@ -112,6 +112,19 @@ A probe workflow ran in a throwaway `testing` repository. Its job used `runs-on:
 | `permissions` on `GET /repos/{owner}/{repo}` with the built-in token | **Returned.** Status 200 with `{"admin":false,"push":true,"pull":true}` for all three forms of the token. |
 
 The built-in token's `permissions` field is present, so the plugin can keep checking `permissions.push` under Actions. The job ran on a repository the `testing` user owns; a repository owned by someone else could give different permissions.
+
+This check was run by hand, and no script in the repository reproduces it. The probe workflow lived in `.gitea/workflows/probe.yml` of a throwaway `sr-e2e-<timestamp>` repository, triggered by `on: push`. It had one job with `runs-on: ubuntu-latest` and two steps. The first printed the names (not the values) of environment variables starting with `GITEA_`, `GITHUB_` or `ACTIONS_`. The second mapped the three token expressions into variables and called the API with each:
+
+```yaml
+env:
+  TOK_SECRETS: ${{ secrets.GITHUB_TOKEN }}
+  TOK_GITEA: ${{ gitea.token }}
+  TOK_GITHUB: ${{ github.token }}
+run: |
+  curl -s -H "Authorization: token $TOK_SECRETS" "$GITHUB_SERVER_URL/api/v1/repos/$GITHUB_REPOSITORY"
+```
+
+The step printed the status code, the length of each token and the `permissions` object, never a token. The job log was read through `GET …/actions/jobs/{id}/logs`, and the repository was deleted afterwards (status 204).
 
 ### 11. Repository URL forms
 

@@ -41,7 +41,7 @@ lib/
 | `success` | Finds pull requests that contain the released commits, and issues they or the commit messages close. Comments and labels each one. | `GET …/commits/{sha}/pull`, `GET …/pulls/{n}/commits`, `POST …/issues/{n}/comments`, `POST …/issues/{n}/labels`, `GET`/`POST …/labels` |
 | `fail` | Finds the open failure issue by label and hidden marker. Comments on it, or opens one. Labels are resolved to numeric IDs first, creating missing ones with a colour. | `GET`/`POST …/labels`, `GET …/issues?state=open&type=issues&labels=`, `POST …/issues`, `POST …/issues/{n}/comments` |
 
-The endpoint shapes above were checked against Gitea 28.2.0 on 2026-10-22; see [the verification record](gitea-api-verification.md). They work as written. Three results matter most. `labels` on issue create takes numeric IDs only, so names must be resolved first. A draft release can be fetched by tag. The per-commit pull request endpoint finds a pull request from the commit the merge recorded, but not from the other commits inside a merge-commit or rebase pull request. Asset upload uses the multipart field `attachment`.
+The endpoint shapes above were checked against Gitea 28.2.0 on 2026-10-22; see [the verification record](gitea-api-verification.md). They work, with the corrections below. Three results matter most. `labels` on issue create takes numeric IDs only, so names must be resolved first. A draft release can be fetched by tag. The per-commit pull request endpoint finds a pull request from the commit the merge recorded, but not from the other commits inside a merge-commit or rebase pull request. Asset upload uses the multipart field `attachment`.
 
 ### Configuration
 
@@ -83,7 +83,7 @@ Four constraints shaped the design.
 ## Trade-offs and limits
 
 - `success` costs one request per released commit plus one per candidate pull request. A release of 200 commits makes a few hundred calls. That is acceptable for a release job that runs once, and the in-flight limit keeps it from flooding a small self-hosted server. A cache by pull-request number avoids repeat lookups.
-- Targeting Gitea's current stable release means the minimum supported version is 28.2.0, the only version tested. Verify reads `GET /version` and reports a clear error below that. Gitea version numbers no longer start with `1.`, so the comparison must use the numbers it gets and not assume a `1.` prefix. Whether older servers have `GET /commits/{sha}/pull` was not checked.
+- Targeting Gitea's current stable release means the minimum supported version is 28.2.0, the only version tested. Verify reads `GET /version` and reports a clear error below that. The tested server reports `28.2.0`, not a `1.x` number, so the check must compare the numbers it gets. Whether older or differently numbered servers have `GET /commits/{sha}/pull` was not checked.
 - On GitHub, a pull request can be linked to its commits by several routes. On Gitea, the per-commit endpoint maps only the commit the merge recorded: the merge commit, the squash commit or the last rebased commit. The other commits inside a merge-commit or rebase pull request return 404. All three styles still find their pull request, because that commit is in the release's commit list. A `(#N)` reference in the commit subject is a second source (ADR-0005). Measured on 28.2.0; see [check 6](gitea-api-verification.md#6-pull-request-lookup-by-commit).
 
 ## Open questions
