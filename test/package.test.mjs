@@ -16,7 +16,8 @@ test('package is named, public and an ES module entry at index.js', () => {
 
 test('engines and peer dependency match ADR-0003', () => {
   assert.equal(pkg.engines.node, '^22.14.0 || >= 24.10.0');
-  assert.deepEqual(pkg.peerDependencies, { 'semantic-release': '>=24.1.0' });
+  assert.equal(pkg.peerDependencies['semantic-release'], '>=24.1.0');
+  assert.deepEqual(Object.keys(pkg.peerDependencies).sort(), ['semantic-release', 'undici']);
 });
 
 test('only the source, lib and type declarations are published', () => {
@@ -57,4 +58,9 @@ test('the runtime dependencies are the two error packages, and every dependency 
 test('npm test and npm run lint are defined', () => {
   assert.equal(pkg.scripts.test, 'node --test "test/**/*.test.mjs"');
   assert.equal(pkg.scripts.lint, 'tsc --noEmit');
+});
+
+test('undici is an optional peer dependency, needed only for a proxy', () => {
+  assert.ok(pkg.peerDependencies.undici, 'undici should be listed as a peer dependency');
+  assert.deepEqual(pkg.peerDependenciesMeta, { undici: { optional: true } });
 });
