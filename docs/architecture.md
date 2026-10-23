@@ -35,7 +35,7 @@ lib/
 
 | Step | What it does | Gitea endpoints |
 |---|---|---|
-| `verifyConditions` | Validates options. Checks the token is valid, the repo exists, the repo was not renamed, and the token can push. | `GET /repos/{owner}/{repo}` (returns `permissions.push` and `clone_url`) |
+| `verifyConditions` | Validates options. Checks the server version, that the token is valid, the repo exists, the repo was not renamed, and the token can push. | `GET /version` (28.2.0 or newer), `GET /repos/{owner}/{repo}` (returns `permissions.push` and `clone_url`) |
 | `publish` | Creates the release. With assets: creates a draft, uploads each asset, then sets `draft: false`. | `POST /repos/{owner}/{repo}/releases`, `POST …/releases/{id}/assets?name=`, `PATCH …/releases/{id}` |
 | `addChannel` | Updates the existing release for a tag (pre-release flag, name), or creates it when none exists. | `GET …/releases/tags/{tag}`, `PATCH …/releases/{id}`, `POST …/releases` |
 | `success` | Finds pull requests that contain the released commits, and issues they or the commit messages close. Comments and labels each one. | `GET …/commits/{sha}/pull`, `GET …/pulls/{n}/commits`, `POST …/issues/{n}/comments`, `POST …/issues/{n}/labels`, `GET`/`POST …/labels` |
@@ -94,7 +94,7 @@ Four constraints shaped the design.
 4. Does the "Do not check permissions under CI" exception need a Gitea Actions equivalent? Answered 2026-10-22: no exception is needed. The built-in token returns `permissions` (check 10). It is available as `secrets.GITHUB_TOKEN`, `gitea.token` and `github.token`, and is not set as an environment variable by default (ADR-0004).
 5. Repository URLs on a server installed under a sub-path (`https://host/gitea/owner/repo`) are parsed wrongly by the GitHub plugin's rules; the `ssh://git@host:2222/owner/repo.git` form parses correctly ([check 11](gitea-api-verification.md#11-repository-url-forms)). Derive the base from `giteaUrl` when set, and test the sub-path form in the plugin's own tests.
 6. Settled 2026-10-22: the owner agreed the personal server's hostname may stay in this public repository.
-7. Does `verifyConditions` copy options from a `publish` plugin entry, as the GitHub plugin does? Decide whether to keep that, since it matters when a user lists the plugin twice.
+7. Answered 2026-10-22 (issue #8): yes. `verifyConditions` copies `assets`, `successComment`, `failComment`, `failTitle`, `labels`, `assignees` and `discussionCategoryName` from the entry of the legacy top-level `publish` option whose `path` is `semantic-release-gitea`, for each one the plugin's own config leaves out. It copies onto a clone, so the config semantic-release passed in is not changed. A bad value on that entry then fails before any release step runs, and each distinct resulting config is verified once.
 
 ## Related
 

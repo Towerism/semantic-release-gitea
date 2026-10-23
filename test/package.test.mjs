@@ -16,7 +16,8 @@ test('package is named, public and an ES module entry at index.js', () => {
 
 test('engines and peer dependency match ADR-0003', () => {
   assert.equal(pkg.engines.node, '^22.14.0 || >= 24.10.0');
-  assert.deepEqual(pkg.peerDependencies, { 'semantic-release': '>=24.1.0' });
+  assert.equal(pkg.peerDependencies['semantic-release'], '>=24.1.0');
+  assert.deepEqual(Object.keys(pkg.peerDependencies).sort(), ['semantic-release', 'undici']);
 });
 
 test('only the source, lib and type declarations are published', () => {
@@ -31,8 +32,11 @@ test('repository metadata points at the GitHub repository, without provenance se
   assert.deepEqual(pkg.publishConfig, { access: 'public' });
 });
 
-test('there are no runtime dependencies and every dev dependency is pinned exactly', () => {
-  assert.equal(pkg.dependencies, undefined);
+test('the runtime dependencies are the two error packages, and every dependency is pinned exactly', () => {
+  assert.deepEqual(Object.keys(pkg.dependencies).sort(), ['@semantic-release/error', 'aggregate-error']);
+  for (const [name, version] of Object.entries(pkg.dependencies)) {
+    assert.match(String(version), /^\d+\.\d+\.\d+$/, `${name} must be pinned to an exact version`);
+  }
   const allowed = [
     '@semantic-release/commit-analyzer',
     '@semantic-release/github',
@@ -54,4 +58,9 @@ test('there are no runtime dependencies and every dev dependency is pinned exact
 test('npm test and npm run lint are defined', () => {
   assert.equal(pkg.scripts.test, 'node --test "test/**/*.test.mjs"');
   assert.equal(pkg.scripts.lint, 'tsc --noEmit');
+});
+
+test('undici is an optional peer dependency, needed only for a proxy', () => {
+  assert.ok(pkg.peerDependencies.undici, 'undici should be listed as a peer dependency');
+  assert.deepEqual(pkg.peerDependenciesMeta, { undici: { optional: true } });
 });
