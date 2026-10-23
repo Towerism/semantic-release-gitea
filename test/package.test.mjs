@@ -32,8 +32,8 @@ test('repository metadata points at the GitHub repository, without provenance se
   assert.deepEqual(pkg.publishConfig, { access: 'public' });
 });
 
-test('the runtime dependencies are the two error packages, and every dependency is pinned exactly', () => {
-  assert.deepEqual(Object.keys(pkg.dependencies).sort(), ['@semantic-release/error', 'aggregate-error']);
+test('the runtime dependencies are the two error packages, the template library and the glob library, all pinned exactly', () => {
+  assert.deepEqual(Object.keys(pkg.dependencies).sort(), ['@semantic-release/error', 'aggregate-error', 'lodash-es', 'tinyglobby']);
   for (const [name, version] of Object.entries(pkg.dependencies)) {
     assert.match(String(version), /^\d+\.\d+\.\d+$/, `${name} must be pinned to an exact version`);
   }
@@ -42,6 +42,7 @@ test('the runtime dependencies are the two error packages, and every dependency 
     '@semantic-release/github',
     '@semantic-release/npm',
     '@semantic-release/release-notes-generator',
+    '@types/lodash-es',
     '@types/node',
     'issue-parser',
     'semantic-release',

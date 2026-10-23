@@ -7,6 +7,7 @@
     "checkJs": true,
     "noEmit": true,
     "strict": true,
+    "skipLibCheck": true,
     "types": ["node"]
   },
   "include": ["index.js", "lib/**/*.js", "lib/**/*.d.ts","test/**/*.mjs"],
