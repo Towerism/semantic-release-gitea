@@ -101,15 +101,89 @@ test('the release job turns on provenance and runs one at a time', async () => {
   assert.deepEqual(job.concurrency ?? doc.concurrency, { group: 'release', 'cancel-in-progress': false });
 });
 
-test('the only secret any workflow reads is GITHUB_TOKEN', async () => {
+/**
+ * The secrets a workflow file reads that it is not allowed to read: e2e.yml may read only
+ * GITEA_E2E_TOKEN, and every other workflow may read only GITHUB_TOKEN.
+ *
+ * @param {string} name file name under .github/workflows
+ * @param {string} text file contents
+ * @returns {string[]}
+ */
+function unexpectedSecrets(name, text) {
+  const allowed = name === 'e2e.yml' ? 'GITEA_E2E_TOKEN' : 'GITHUB_TOKEN';
+  return [...text.matchAll(/secrets\.(\w+)/g)].map((m) => m[1]).filter((secret) => secret !== allowed);
+}
+
+test('every workflow reads only the secret it is allowed to', async () => {
   const names = (await readdir(workflowsDir)).filter((name) => name.endsWith('.yml'));
   for (const name of names) {
     const { text } = await load(name);
-    const secrets = [...text.matchAll(/secrets\.(\w+)/g)].map((m) => m[1]);
-    for (const secret of secrets) {
-      assert.equal(secret, 'GITHUB_TOKEN', `${name} reads secrets.${secret}`);
-    }
+    assert.deepEqual(unexpectedSecrets(name, text), [], `${name} reads a secret it should not`);
   }
+});
+
+test('the secrets check rejects another secret in ci.yml and accepts GITEA_E2E_TOKEN in e2e.yml only', async () => {
+  const { text } = await load('ci.yml');
+  assert.deepEqual(unexpectedSecrets('ci.yml', `${text}\n# \${{ secrets.OTHER }}`), ['OTHER']);
+  assert.deepEqual(unexpectedSecrets('ci.yml', '${{ secrets.GITEA_E2E_TOKEN }}'), ['GITEA_E2E_TOKEN']);
+  assert.deepEqual(unexpectedSecrets('e2e.yml', '${{ secrets.GITEA_E2E_TOKEN }}'), []);
+  assert.deepEqual(unexpectedSecrets('e2e.yml', '${{ secrets.GITHUB_TOKEN }}'), ['GITHUB_TOKEN']);
+  assert.deepEqual(unexpectedSecrets('release.yml', '${{ secrets.GITHUB_TOKEN }}'), []);
+});
+
+test('e2e runs on manual dispatch and on pushes to main, and never on pull requests', async () => {
+  const { doc } = await load('e2e.yml');
+  assert.deepEqual(Object.keys(doc.on).sort(), ['push', 'workflow_dispatch']);
+  assert.deepEqual(doc.on.push.branches, ['main']);
+});
+
+test('e2e has read-only permissions, one 10-minute job on Node 24, and runs one at a time without cancelling', async () => {
+  const { doc } = await load('e2e.yml');
+  assert.deepEqual(doc.permissions, { contents: 'read' });
+  const jobs = Object.values(doc.jobs);
+  assert.equal(jobs.length, 1);
+  const job = /** @type {any} */ (jobs[0]);
+  assert.equal(job['runs-on'], 'ubuntu-latest');
+  assert.ok(job['timeout-minutes'] > 0 && job['timeout-minutes'] <= 10, 'timeout-minutes must be set to 10 or less');
+  const setupNode = job.steps.find((/** @type {{ uses?: string }} */ step) => step.uses?.startsWith('actions/setup-node@'));
+  assert.equal(String(setupNode.with['node-version']), '24');
+  assert.deepEqual(doc.concurrency ?? job.concurrency, { group: 'e2e', 'cancel-in-progress': false });
+});
+
+test('e2e passes the variable and the secret to the test step only, and writes no URL or token literal', async () => {
+  const { text, doc } = await load('e2e.yml');
+  const job = /** @type {any} */ (Object.values(doc.jobs)[0]);
+  assert.equal(doc.env, undefined, 'no workflow-level env');
+  assert.equal(job.env, undefined, 'no job-level env');
+  const withEnv = job.steps.filter((/** @type {{ env?: object }} */ step) => step.env);
+  assert.equal(withEnv.length, 1);
+  assert.equal(withEnv[0].run, 'node --test test/e2e.test.mjs');
+  assert.deepEqual(withEnv[0].env, {
+    GITEA_E2E_URL: '${{ vars.GITEA_E2E_URL }}',
+    GITEA_E2E_TOKEN: '${{ secrets.GITEA_E2E_TOKEN }}',
+    E2E_REQUIRED: 'true',
+  });
+  assert.doesNotMatch(text, /https?:\/\//);
+  const withoutPins = text.split('\n').filter((line) => !/uses:/.test(line)).join('\n');
+  assert.doesNotMatch(withoutPins, /[0-9a-f]{32,}/i, 'no token-like literal');
+});
+
+test('e2e installs with npm ci, runs only the e2e test file, uses no cache, and does not persist checkout credentials', async () => {
+  const { text, doc } = await load('e2e.yml');
+  const job = /** @type {any} */ (Object.values(doc.jobs)[0]);
+  assert.deepEqual(runCommands(job), ['npm ci', 'node --test test/e2e.test.mjs']);
+  assert.doesNotMatch(text, /^\s*cache:/m);
+  const checkout = job.steps.find((/** @type {{ uses?: string }} */ step) => step.uses?.startsWith('actions/checkout@'));
+  assert.equal(checkout.with['persist-credentials'], false);
+});
+
+test('ci and release do not mention the end-to-end variables, and release still needs only lint and test', async () => {
+  for (const name of ['ci.yml', 'release.yml']) {
+    const { text } = await load(name);
+    assert.doesNotMatch(text, /GITEA_E2E|E2E_REQUIRED/, `${name} must not use the e2e variables`);
+  }
+  const { doc } = await load('release.yml');
+  assert.deepEqual([...doc.jobs.release.needs].sort(), ['lint', 'test']);
 });
 
 test('.releaserc.json lists the four plugins and releases from main only', async () => {
