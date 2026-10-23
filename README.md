@@ -129,6 +129,8 @@ npm run lint   # type-checks the JavaScript with tsc
 npm test       # runs every test under test/ with node --test
 ```
 
+To run the end-to-end test against a Gitea server, set `GITEA_E2E_URL` (the server address) and `GITEA_E2E_TOKEN` (a token of the `testing` user) and run `node --test test/e2e.test.mjs`. Without them it is skipped. In CI, `.github/workflows/e2e.yml` runs it on `workflow_dispatch` and on pushes to `main`, and fails if either value is missing.
+
 The design decisions are in [docs/adr/](docs/adr/).
 
 ## Maintainer notes
@@ -140,3 +142,6 @@ These steps belong to the repository owner. They are not automated.
 3. No `v0.0.0` tag. Do not tag the placeholder. With no version tags in the repository, semantic-release's first automated release is `1.0.0`.
 4. Turning releases on. The release workflow runs on every push to `main`. Its release job is skipped until you set the repository variable `RELEASES_ENABLED` to `true` (Settings, then Secrets and variables, then Actions, then Variables). Set it when v1 is ready.
 5. Undoing a bad release. npm never lets you reuse a version. Mark it with `npm deprecate semantic-release-gitea@<version> "<reason>"` and ship a fix. Do not delete tags.
+6. End-to-end variable. Set the repository Actions variable `GITEA_E2E_URL` to the address of the test Gitea server (Settings, then Secrets and variables, then Actions, then Variables).
+7. End-to-end secret. Set the repository Actions secret `GITEA_E2E_TOKEN` to a token of the `testing` user with repository and issue scopes. A repository-level secret can be read by any workflow file on any branch, which is acceptable while you are the only collaborator.
+8. End-to-end workflow. `e2e.yml` runs on `workflow_dispatch` and on pushes to `main`, not on pull requests. After changing the variable, the secret or the workflow, start it by hand from the Actions tab and check that the log shows the test ran and no repository named `sr-e2e-` remains on the server.
