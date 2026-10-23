@@ -1,6 +1,6 @@
 # Releases are on. The release job runs only while the repository variable
 # RELEASES_ENABLED is "true" (Settings > Secrets and variables > Actions >
-# Variables). With it unset, this workflow only runs lint and test.
+# Variables). With any other value, this workflow only runs lint and test.
 name: Release
 
 on:
