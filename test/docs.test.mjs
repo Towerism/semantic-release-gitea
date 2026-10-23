@@ -87,3 +87,31 @@ test('the architecture document lists GET /version for verifyConditions and answ
   assert.match(row, /GET \/version/);
   assert.match(architecture, /^7\. (Answered|Settled)/m);
 });
+
+test('ADR-0006 has an amendment that moves the end-to-end test into CI, and no longer says CI holds no token', async () => {
+  const adr = await read('docs/adr/0006-test-strategy.md');
+  assert.match(adr, /^## Amendment, 2026-10-22$/m);
+  const amendment = adr.slice(adr.search(/^## Amendment/m));
+  for (const text of ['.github/workflows/e2e.yml', 'workflow_dispatch', 'pushes to `main`', 'GitHub-hosted', 'E2E_REQUIRED', 'secret store']) {
+    assert.ok(amendment.includes(text), `the amendment should mention ${text}`);
+  }
+  assert.match(amendment, /pull request/i);
+  assert.match(amendment, /write access/i);
+  assert.ok(amendment.includes('workflow_dispatch plus a push to main'), "the amendment should quote the owner's decision");
+  assert.doesNotMatch(adr, /never holds a token/i);
+  assert.doesNotMatch(adr, /on a self-hosted runner\./);
+  const decision = adr.slice(adr.indexOf('## Decision'), adr.indexOf('## Consequences'));
+  assert.match(decision, /E2E_REQUIRED/);
+});
+
+test('README says how to run the end-to-end test and lists the variable, the secret and the workflow in the maintainer notes', async () => {
+  const readme = await read('README.md');
+  const development = readme.slice(readme.search(/^## Development$/m), readme.search(/^## Maintainer notes$/m));
+  for (const text of ['GITEA_E2E_URL', 'GITEA_E2E_TOKEN', 'e2e.yml', 'workflow_dispatch']) {
+    assert.ok(development.includes(text), `the Development section should mention ${text}`);
+  }
+  const notes = readme.slice(readme.search(/^## Maintainer notes$/m));
+  assert.match(notes, /^6\. .*GITEA_E2E_URL/m);
+  assert.match(notes, /^7\. .*GITEA_E2E_TOKEN/m);
+  assert.match(notes, /^8\. .*e2e\.yml/m);
+});
