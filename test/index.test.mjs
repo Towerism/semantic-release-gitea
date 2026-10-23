@@ -5,22 +5,10 @@ import * as plugin from '../index.js';
 import { fixture, serve } from './support/server.mjs';
 
 const LIFECYCLE = ['addChannel', 'fail', 'publish', 'success', 'verifyConditions'];
-const NOT_YET = ['fail', 'success'];
 const TOKEN = 'tok-1234567890abcdef';
 
 test('index.js exports exactly the five lifecycle functions', () => {
   assert.deepEqual(Object.keys(plugin).sort(), LIFECYCLE);
-});
-
-test('the two steps that are not built yet return a promise that rejects as not implemented', async () => {
-  const functions = /** @type {Record<string, (a: object, b: object) => Promise<unknown>>} */ (
-    /** @type {unknown} */ (plugin)
-  );
-  for (const name of NOT_YET) {
-    const result = functions[name]({}, {});
-    assert.ok(result instanceof Promise, `${name} must be async, not throw synchronously`);
-    await assert.rejects(result, /not implemented/i, `${name} should say it is not implemented`);
-  }
 });
 
 test('index.d.ts declares the same names as index.js exports, and no others', async () => {
@@ -44,14 +32,14 @@ test('index.d.ts types the options and the context instead of object', async () 
 // --- verifyConditions against a local server ------------------------------
 
 /** Answers /version and the repository like a healthy Gitea, and counts requests per path. */
-async function giteaServer(/** @type {(path: string) => import('./support/server.mjs').Fixture | undefined} */ override = () => undefined) {
+async function giteaServer(/** @type {(path: string, method: string) => import('./support/server.mjs').Fixture | undefined} */ override = () => undefined) {
   /** @type {string[]} */
   const paths = [];
   const server = await serve([
     (req, res) => {
       const path = String(req.url);
       paths.push(path);
-      const answer = override(path) ?? (path === '/api/v1/version' ? fixture('version') : path === '/api/v1/repos/owner/repo' ? fixture('repo') : fixture('not-found'));
+      const answer = override(path, String(req.method)) ?? (path === '/api/v1/version' ? fixture('version') : path === '/api/v1/repos/owner/repo' ? fixture('repo') : fixture('not-found'));
       res.writeHead(answer.status, { 'content-type': 'application/json' }).end(JSON.stringify(answer.body));
     },
   ]);
@@ -76,7 +64,11 @@ function contextFor(url, env = {}) {
     context: /** @type {import('../index.js').Context} */ (/** @type {unknown} */ ({
       env: { GITEA_TOKEN: TOKEN, GITEA_URL: url, ...env },
       options: { repositoryUrl: `${url}/owner/repo.git#test-${contexts}` },
-      logger: { log: (/** @type {string} */ message, /** @type {unknown[]} */ ...values) => void logged.push([message, ...values].join(' ')) },
+      logger: { log: (/** @type {string} */ message, /** @type {unknown[]} */ ...values) => void logged.push([message, ...values].join(' ')), warn() {}, error() {} },
+      commits: [],
+      branch: { name: 'main' },
+      errors: [Object.assign(new Error('The npm token is invalid'), { details: 'Set NPM_TOKEN.' })],
+      nextRelease: { version: '1.0.0', gitTag: 'v1.0.0', channel: null, notes: 'n' },
     })),
   };
 }
@@ -195,6 +187,82 @@ test('a publish option that is a single object or a string is handled', async ()
     await assert.rejects(plugin.verifyConditions({}, context), (/** @type {any} */ error) => [...error.errors].some((e) => e.code === 'EUNSUPPORTEDOPTION'));
     context.options.publish = 'semantic-release-gitea';
     await plugin.verifyConditions({}, context);
+  } finally {
+    await server.close();
+  }
+});
+
+// --- success and fail against a local server ------------------------------
+
+/** @param {unknown} body @param {number} [status] */
+const answer = (body, status = 200) => ({ source: 'test', giteaVersion: null, status, body });
+
+/** A Gitea that has no open issues or labels and accepts new ones. */
+function emptyGitea() {
+  return (/** @type {string} */ path, /** @type {string} */ method = 'GET') => {
+    if (path.startsWith('/api/v1/repos/owner/repo/issues?')) return answer([]);
+    if (path.startsWith('/api/v1/repos/owner/repo/labels') && method === 'GET') return answer([]);
+    return undefined;
+  };
+}
+
+test('success runs after the cached verification and does not verify again', async () => {
+  const { server, paths } = await giteaServer(emptyGitea());
+  try {
+    const { context } = contextFor(server.url);
+    await plugin.verifyConditions({}, context);
+    await plugin.success({}, context);
+    assert.deepEqual(paths.filter((path) => path === '/api/v1/version' || path === '/api/v1/repos/owner/repo'), ['/api/v1/version', '/api/v1/repos/owner/repo']);
+    assert.ok(paths.some((path) => path.startsWith('/api/v1/repos/owner/repo/issues?')), 'it looked for open failure issues');
+  } finally {
+    await server.close();
+  }
+});
+
+test('fail opens an issue even when verification would fail, and never reads the server version', async () => {
+  /** @type {string[]} */
+  const created = [];
+  const { server, paths } = await giteaServer((path, method) => {
+    if (path === '/api/v1/repos/owner/repo/issues') return answer({ number: 3, html_url: 'https://git.example/owner/repo/issues/3' }, 201);
+    if (path === '/api/v1/repos/owner/repo/labels' && method === 'POST') return answer({ id: 1, name: 'semantic-release' }, 201);
+    return emptyGitea()(path, method);
+  });
+  try {
+    const { context } = contextFor(server.url);
+    await plugin.fail(/** @type {any} */ ({ discussionCategoryName: 'Releases' }), context);
+    created.push(...server.requests.filter((r) => r.method === 'POST' && r.url === '/api/v1/repos/owner/repo/issues').map((r) => r.body));
+    assert.equal(created.length, 1);
+    assert.match(JSON.parse(created[0]).body, /The npm token is invalid/);
+    assert.equal(paths.includes('/api/v1/version'), false);
+  } finally {
+    await server.close();
+  }
+});
+
+test('fail takes failTitle from this plugin’s entry in the legacy publish option', async () => {
+  const { server } = await giteaServer((path, method) => {
+    if (path === '/api/v1/repos/owner/repo/issues') return answer({ number: 3, html_url: 'https://git.example/owner/repo/issues/3' }, 201);
+    if (path === '/api/v1/repos/owner/repo/labels' && method === 'POST') return answer({ id: 1, name: 'semantic-release' }, 201);
+    return emptyGitea()(path, method);
+  });
+  try {
+    const { context } = contextFor(server.url);
+    context.options.publish = [{ path: 'semantic-release-gitea', failTitle: 'From the publish entry' }];
+    await plugin.fail({}, context);
+    const post = server.requests.find((r) => r.method === 'POST' && r.url === '/api/v1/repos/owner/repo/issues');
+    assert.equal(JSON.parse(post?.body ?? '{}').title, 'From the publish entry');
+  } finally {
+    await server.close();
+  }
+});
+
+test('fail without a token rejects with ENOGITEATOKEN and sends no request', async () => {
+  const { server, paths } = await giteaServer();
+  try {
+    const { context } = contextFor(server.url);
+    context.env = { GITEA_URL: server.url };
+    await assert.rejects(plugin.fail({}, context), (error) => /** @type {any} */ ([...(/** @type {any} */ (error).errors)].map((e) => e.code)).join() === 'ENOGITEATOKEN');
+    assert.equal(paths.length, 0);
   } finally {
     await server.close();
   }
