@@ -55,6 +55,8 @@ export interface Context {
   nextRelease?: NextRelease;
   branch?: { name: string; channel?: string | null; prerelease?: boolean | string };
   commits?: Array<{ hash: string; message: string }>;
+  /** One entry per plugin that published a release; this plugin's is named `Gitea release`. */
+  releases?: Array<{ name?: string; url?: string; id?: number }>;
   errors?: Error[];
 }
 

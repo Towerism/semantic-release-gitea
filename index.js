@@ -1,13 +1,16 @@
 /**
  * Entry point of the semantic-release plugin. semantic-release calls these
- * five functions at fixed steps of a release. `verifyConditions`, `publish` and
- * `addChannel` are built; `success` and `fail` reject until the issue that
- * implements them lands.
+ * five functions at fixed steps of a release. Every step but `fail` verifies
+ * the setup first; `fail` does not, because the checks of `verifyConditions`
+ * are among the failures it has to report (ADR-0008).
  */
 import { addChannel as addChannelStep } from './lib/add-channel.js';
+import { connect } from './lib/connect.js';
 import { PLUGIN_NAME } from './lib/definitions/constants.js';
+import { fail as failStep } from './lib/fail.js';
 import { publish as publishStep } from './lib/publish.js';
 import { resolveConfig } from './lib/resolve-config.js';
+import { success as successStep } from './lib/success.js';
 import { verify } from './lib/verify.js';
 
 /** Options that a legacy `publish` entry may carry, checked early so a bad one fails before any release step. */
@@ -80,14 +83,6 @@ async function getVerified(pluginConfig, context) {
 }
 
 /**
- * @param {string} step
- * @returns {Promise<never>}
- */
-async function notImplemented(step) {
-  throw new Error(`semantic-release-gitea: ${step} is not implemented yet`);
-}
-
-/**
  * Checks the options, the token, the server version and the repository, and
  * fails the release early with every problem found.
  *
@@ -123,19 +118,26 @@ export async function addChannel(pluginConfig, context) {
 }
 
 /**
- * @param {import('./index.js').PluginConfig} _pluginConfig
- * @param {import('./index.js').Context} _context
+ * Comments on the pull requests and issues the release contains, labels them,
+ * closes the open failure issues, and lists the other releases in the notes.
+ *
+ * @param {import('./index.js').PluginConfig} pluginConfig
+ * @param {import('./index.js').Context} context
  * @returns {Promise<void>}
  */
-export async function success(_pluginConfig, _context) {
-  return notImplemented('success');
+export async function success(pluginConfig, context) {
+  return successStep(await getVerified(pluginConfig, context), context);
 }
 
 /**
- * @param {import('./index.js').PluginConfig} _pluginConfig
- * @param {import('./index.js').Context} _context
+ * Opens an issue for a failed release, or comments on the one that is open.
+ * It does not run the full verification: it needs only a token, a server
+ * address and a repository.
+ *
+ * @param {import('./index.js').PluginConfig} pluginConfig
+ * @param {import('./index.js').Context} context
  * @returns {Promise<void>}
  */
-export async function fail(_pluginConfig, _context) {
-  return notImplemented('fail');
+export async function fail(pluginConfig, context) {
+  return failStep(await connect(withPublishEntry(pluginConfig, context), context), context);
 }

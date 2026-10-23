@@ -1,0 +1,6 @@
+{
+  "source": "synthetic",
+  "giteaVersion": null,
+  "status": 200,
+  "body": [{ "sha": "ghi3" }, { "sha": "branch-only" }]
+}

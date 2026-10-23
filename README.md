@@ -2,7 +2,7 @@
 
 A [semantic-release](https://github.com/semantic-release/semantic-release) plugin for projects hosted on a [Gitea](https://about.gitea.com/) server. It will do for Gitea what `@semantic-release/github` does for GitHub: publish a release, then comment on or open issues and pull requests.
 
-**Status: not yet functional.** `verifyConditions`, `publish` and `addChannel` are built. They check your setup, create the release on Gitea with its files, and move a release to another channel. The other two steps, `success` and `fail`, are not implemented and reject with "not implemented", so do not use the plugin in a real release yet. [docs/architecture.md](docs/architecture.md) describes what it will do.
+**Status: all five steps are built; the package is not published yet.** `verifyConditions`, `publish`, `addChannel`, `success` and `fail` are implemented and tested against a real Gitea server. Releases stay off until v1 (see the maintainer notes). [docs/architecture.md](docs/architecture.md) describes the design.
 
 ## Usage
 
@@ -49,7 +49,7 @@ Both steps return `{ url, name: "Gitea release" }` (and `id` for `publish`), the
 
 ## Options
 
-Option names follow `@semantic-release/github` where Gitea has an equivalent, so a config can move over with the plugin name and the URL options changed. The URL options, `proxy`, `assets`, `draftRelease`, `releaseNameTemplate` and `releaseBodyTemplate` are used today. The rest are checked now and used by the steps that are not built yet.
+Option names follow `@semantic-release/github` where Gitea has an equivalent, so a config can move over with the plugin name and the URL options changed.
 
 | Option | Type | Default | Meaning |
 |---|---|---|---|
@@ -58,21 +58,63 @@ Option names follow `@semantic-release/github` where Gitea has an equivalent, so
 | `giteaApiPrefix` | string | `GITEA_PREFIX`, else `/api/v1` | Path of the API under `giteaUrl`. |
 | `proxy` | string, `{ host, port }` or `false` | `http_proxy`, then `HTTP_PROXY`, else `false` | Proxy for all requests. Needs the optional `undici` package. |
 | `assets` | array | none | Files to attach to the release: globs, arrays of globs, or objects with a `path` and optional `name` (a template). A `label` is ignored. |
-| `successComment` | string or `false` | none | Template for the comment on released issues and pull requests. |
-| `successCommentCondition` | string or `false` | none | Template that decides whether to comment. |
+| `successComment` | string or `false` | built-in text | Template for the comment on released issues and pull requests. `false` turns the comments off. |
+| `successCommentCondition` | string or `false` | none | Template that decides, for each issue or pull request, whether to comment. `false` turns the comments off. |
 | `failTitle` | string or `false` | `The automated release is failing 🚨` | Title of the issue opened when a release fails. |
-| `failComment` | string or `false` | none | Template for the comment on that issue. |
-| `failCommentCondition` | string or `false` | none | Template that decides whether to open or update it. |
-| `labels` | array or `false` | `["semantic-release"]` | Labels for the failure issue. |
+| `failComment` | string or `false` | built-in text | Template for the text of the failure issue and of later comments on it. |
+| `failCommentCondition` | string or `false` | none | Template that decides whether to open or update the failure issue. `false` also stops `success` from closing it. |
+| `labels` | array or `false` | `["semantic-release"]` | Labels for the failure issue. The label `semantic-release` is always added too. |
 | `assignees` | array | none | Users to assign to the failure issue. |
 | `releasedLabels` | array or `false` | `released` (plus ` on @channel` for a channel) | Labels added to released issues and pull requests. |
-| `addReleases` | `"top"`, `"bottom"` or `false` | `false` | Whether to list other releases in the release notes. Applied by `success`, which is not built yet. |
+| `addReleases` | `"top"`, `"bottom"` or `false` | `false` | Whether to list the releases other plugins made in this release's notes, above (`top`) or below (`bottom`) them. Applied by `success`. |
 | `draftRelease` | boolean | `false` | Leave the release as a draft instead of publishing it. |
 | `releaseBodyTemplate` | string | `<%= nextRelease.notes %>` | Template for the release notes. |
 | `releaseNameTemplate` | string | `<%= nextRelease.name %>` | Template for the release name. |
 | `discussionCategoryName` | `false` | `false` | Not supported. Any other value fails with `EUNSUPPORTEDOPTION`. |
 
 The legacy top-level `publish` option may also list this plugin, as an entry whose `path` is `semantic-release-gitea`. The plugin checks that entry too. It copies `assets`, `successComment`, `failComment`, `failTitle`, `labels`, `assignees` and `discussionCategoryName` from it when its own config leaves them out.
+
+## What `success` does
+
+After a release, `success` comments on every pull request and issue the release contains, and labels them. It does four things in order.
+
+1. **Finds pull requests.** For each released commit it asks Gitea which pull request that commit merged (`GET /commits/{sha}/pull`). Gitea answers only for the commit the merge recorded: the merge commit, the squash commit or the last rebased commit. That commit is in the release, so merge-commit, squash and rebase pull requests are all found. A `(#N)` at the end of a commit subject also counts, but only when `#N` is a pull request that is merged and has a commit in the release. A `(#N)` that is an issue is ignored, because it only mentions the issue.
+2. **Finds issues.** The bodies of those pull requests and every released commit message are read with [`issue-parser`](https://github.com/semantic-release/issue-parser) and its `github` preset. `Closes #12`, `Fixes owner/repo#12` and `Closes https://your-server/owner/repo/issues/12` name an issue; a keyword that names another repository is ignored. Gitea pull request addresses (`/pulls/12`) are not read by the preset, so use `#12`.
+3. **Comments and labels.** Each issue or pull request gets one comment, even if several things name it. `releasedLabels` are then added; labels that do not exist are created in grey.
+4. **Tidies up.** Open failure issues from earlier failed releases are closed, and with `addReleases` the other plugins' releases are listed in the release notes.
+
+`successComment` and `successCommentCondition` are lodash templates. They see the whole release context (`nextRelease`, `branch`, `commits`, `releases`, `env` and so on) and `issue`, the object Gitea returned for the item. `issue.pull_request` is set for pull requests and empty for issues. A condition that renders empty or as the text `false` skips that item, so both `<%= … %>` and `<% return … %>` work (the GitHub plugin skips only a real `false` or an empty result):
+
+```json
+{ "successCommentCondition": "<% return issue.state === 'closed' %>" }
+```
+
+The built-in comment says the issue was resolved or the pull request is included in the version, and links the releases. `releasedLabels` entries are templates too, so the default `released` becomes `released on @next` on a channel; an entry that renders empty is skipped.
+
+`addReleases` rewrites the release body with `PATCH /releases/{id}`. The new body is what `releaseBodyTemplate` produced, then a `---` line, then a list of the other plugins' releases (or the list first, with `top`). An edit made to the body between `publish` and `success` is therefore overwritten. It runs only when nothing failed earlier in the step.
+
+`success` sends at most five requests at once and fetches each pull request once. A failure on one item is logged and collected; the rest are still done, and the errors are thrown together at the end. A 403 or 404 answer to a comment is logged and not thrown. Turning off the failure-issue closing is covered under `failCommentCondition` above.
+
+## What `fail` does
+
+When a release fails, `fail` looks for an open failure issue. Those are open issues that carry the hidden line `<!-- semantic-release:gitea -->` in their body. The search reads every page of open issues and does not filter by label, because Gitea accepts two labels with one name and a list filtered by such a name can miss the issue. Anyone who can open issues in the repository can put the line in an issue, and `fail` would then comment on it, so keep issue creation limited on a repository where that matters. If it finds one, it comments on the lowest-numbered one. Otherwise it opens an issue with `failTitle` as the title, `labels` and the label `semantic-release`, and `assignees`. The text is `failComment`, a template that sees `branch` and `errors`, or a built-in text that names the branch and lists each error with its details. `failCommentCondition` is a template that sees the release context and `issue` (the failure issue found, or nothing); an empty or `false` result skips the step.
+
+`fail` does not run the checks of `verifyConditions`, because those checks are among the failures worth reporting ([ADR-0008](docs/adr/0008-fail-without-full-verification.md)). It needs `GITEA_TOKEN`, a server address and a repository in `repositoryUrl`; without them it throws `ENOGITEATOKEN` or `EINVALIDGITEAURL`. An option of the wrong type is replaced by its default and logged. A `failComment` or `failCommentCondition` template that throws falls back to the default text, with the template's error added to the issue. The token is removed from everything `fail` posts, because the errors of other plugins can contain it.
+
+## Differences from the GitHub plugin
+
+| GitHub plugin | This plugin |
+|---|---|
+| `discussionCategoryName` | Rejected by verification with `EUNSUPPORTEDOPTION`. Gitea has no release discussions. |
+| `make_latest` | Dropped. Gitea marks the latest release itself. |
+| Associated pull requests from GraphQL | One `GET /commits/{sha}/pull` per commit, plus a `(#N)` at the end of a subject when it is a merged pull request in the release. At most five requests at once. |
+| Pull request addresses in closing keywords | `/pulls/N` addresses are not read by the `issue-parser` preset. |
+| `issue` is a GraphQL node | `issue` is the Gitea object, with `issue.pull_request` set for pull requests. |
+| `addReleases` writes `nextRelease.notes` | Writes the body `releaseBodyTemplate` produced, so a custom template is kept. |
+| `false` for `successComment` or `failTitle` warns that it is deprecated | Allowed without a warning. |
+| `fail` runs after the same verification as the other steps | `fail` skips the checks of `verifyConditions` and falls back to defaults. |
+| Octokit retries and throttling | A small retry on network errors, 429 and 5xx, honoring `Retry-After`. |
+| The push permission check is skipped under GitHub Actions | Always checked; the built-in Gitea Actions token reports its permissions. |
 
 ## Environment variables
 

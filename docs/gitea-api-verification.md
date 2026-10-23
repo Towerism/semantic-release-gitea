@@ -5,7 +5,7 @@ This page records what the Gitea API did when the checks in [issue #3](https://g
 - **Gitea version tested:** 28.2.0, from `GET /api/v1/version`.
 - **Date:** 2026-10-22.
 - **Minimum supported version:** 28.2.0, the only version tested. One server cannot show that an older version works, and no Gitea release note is cited here for an older one.
-- **Summary:** all 11 checks ran. Three results change the design: issue create takes numeric label IDs only, `issue-parser` ignores `/pulls/N` URLs, and a sub-path install breaks the repository URL parsing.
+- **Summary:** all 12 checks ran (check 12 was added for issue #10). Three results change the design: issue create takes numeric label IDs only, `issue-parser` ignores `/pulls/N` URLs, and a sub-path install breaks the repository URL parsing.
 
 This server reports `28.2.0`, not a `1.x` number. The architecture's earlier wording, "added in 1.16", could not be checked against it, and how other Gitea releases are numbered was not checked. Servers older than 28.2.0, or numbered differently, are untested.
 
@@ -140,3 +140,19 @@ Run offline with the placeholder host `gitea.example`:
 | `git@gitea.example:gitea/owner/repo.git` (sub-path) | `gitea`, `owner/repo` | **no** |
 
 The `ssh://` form with a port parses correctly. A sub-path install breaks the parsing, so `lib/repo-url.js` must take the base from `giteaUrl` when it is set.
+
+### 12. Success and fail steps (issue #10)
+
+Measured on 2026-10-22 by the second test in `test/e2e.test.mjs`, which ran on a throwaway repository on the same Gitea 28.2.0 server, from the owner's shell and from the `e2e.yml` workflow. The test prints these numbers as one `MEASURED` line, with no response bodies, because the Actions log is public.
+
+| Question | Result |
+|---|---|
+| `merged` and `merge_commit_sha` of a pull request merged by each style | Merge commit, squash and rebase: `merged` is true, and `merge_commit_sha` is one of the commits on `main` after the merge. |
+| `GET …/issues/{n}` for a pull request number | 200, with a `pull_request` field. |
+| `labels=` filter on the open-issue list with a label that does not exist | The unknown label is dropped, and the list holds every open issue. |
+| The same filter with an existing and an unknown label | The unknown one is dropped; the issue with the existing label is returned. |
+| The same filter with two existing labels | An issue that has both is returned. Whether an issue with only one of them is returned (any or all) was not tested. |
+| Creating a label whose name already exists | **201.** Gitea allows two labels with one name. There is no duplicate error, so the retry on a 4xx in `lib/labels.js` does not trigger for a duplicate. |
+| The open-issue list filtered by a label name that two labels share | **Returned no issues** for an open issue that carries one of them (1 before the second label existed, 0 after). |
+
+The last result matters for finding failure issues. A listing narrowed by label name can miss the failure issue, so the plugin does not filter by label: it reads every page of open issues and keeps those with the hidden marker in the body. The end-to-end test creates the second label while a failure issue is open, and then checks that the next `fail` still comments on that issue.

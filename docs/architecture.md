@@ -15,7 +15,7 @@ The two existing Gitea plugins cover less. `@saithodev/semantic-release-gitea` 2
 semantic-release calls a plugin's exported functions at fixed steps. Each function gets the plugin's own config and a shared `context` (environment, logger, `nextRelease`, `commits`, `branch`, `errors` and so on).
 
 ```text
-index.js            exports the five lifecycle functions; verifies once, then reuses the result
+index.js            exports the five lifecycle functions; every step but `fail` verifies once and reuses the result (ADR-0008)
 lib/
   resolve-config.js merges plugin options with environment variables and defaults
   verify.js         validates options, then checks URL, token, repo access and write permission
@@ -24,8 +24,11 @@ lib/
   assets.js         turns the `assets` option into readable files with upload names
   is-prerelease.js  decides the pre-release flag from the branch, for both steps above
   release-api.js    the releases path and checks on the fields Gitea answers with
-  success.js        finds pull requests and issues in the release and comments on them
+  success.js        finds pull requests and issues in the release, comments on and labels them, closes failure issues
   fail.js           opens or updates the "release is failing" issue
+  connect.js        what `fail` needs instead of the full verification: token, address, repository
+  failure-issues.js finds the open failure issues by their hidden marker (used by `success` and `fail`)
+  limit.js          keeps `success` to five requests in flight
   client.js         the only module that calls fetch: auth header, retry, errors, pagination
   repo-url.js       turns the repository URL into owner and repo (see Open questions for sub-path hosts)
   labels.js         resolves label names to Gitea's numeric IDs and creates missing labels
@@ -41,8 +44,8 @@ lib/
 | `verifyConditions` | Validates options. Checks the server version, that the token is valid, the repo exists, the repo was not renamed, and the token can push. | `GET /version` (28.2.0 or newer), `GET /repos/{owner}/{repo}` (returns `permissions.push` and `clone_url`) |
 | `publish` | Creates the release. With assets: creates a draft, uploads each asset, then sets `draft: false`. | `POST /repos/{owner}/{repo}/releases`, `POST …/releases/{id}/assets?name=`, `PATCH …/releases/{id}` |
 | `addChannel` | Updates the existing release for a tag (pre-release flag, name), or creates it when none exists. | `GET …/releases/tags/{tag}`, `PATCH …/releases/{id}`, `POST …/releases` |
-| `success` | Finds pull requests that contain the released commits, and issues they or the commit messages close. Comments and labels each one. | `GET …/commits/{sha}/pull`, `GET …/pulls/{n}/commits`, `POST …/issues/{n}/comments`, `POST …/issues/{n}/labels`, `GET`/`POST …/labels` |
-| `fail` | Finds the open failure issue by label and hidden marker. Comments on it, or opens one. Labels are resolved to numeric IDs first, creating missing ones with a colour. | `GET`/`POST …/labels`, `GET …/issues?state=open&type=issues&labels=`, `POST …/issues`, `POST …/issues/{n}/comments` |
+| `success` | Finds pull requests that contain the released commits, and issues they or the commit messages close. Comments and labels each one, closes the open failure issues, and with `addReleases` lists the other plugins' releases in the release notes. | `GET …/commits/{sha}/pull`, `GET …/pulls/{n}`, `GET …/pulls/{n}/commits`, `GET …/issues/{n}`, `POST …/issues/{n}/comments`, `POST …/issues/{n}/labels`, `PATCH …/issues/{n}`, `PATCH …/releases/{id}`, `GET`/`POST …/labels` |
+| `fail` | Reads the repository, finds the open failure issue by hidden marker, and comments on it or opens one. Labels are resolved to numeric IDs first, creating missing ones with a colour. It does not run the full verification (ADR-0008). | `GET /repos/{owner}/{repo}`, `GET`/`POST …/labels`, `GET …/issues?state=open&type=issues`, `POST …/issues`, `POST …/issues/{n}/comments` |
 
 The endpoint shapes above were checked against Gitea 28.2.0 on 2026-10-22; see [the verification record](gitea-api-verification.md). They work, with the corrections below. Three results matter most. `labels` on issue create takes numeric IDs only, so names must be resolved first. A draft release can be fetched by tag. The per-commit pull request endpoint finds a pull request from the commit the merge recorded, but not from the other commits inside a merge-commit or rebase pull request. Asset upload uses the multipart field `attachment`.
 
@@ -81,6 +84,9 @@ Four constraints shaped the design.
 | GraphQL for associated PRs and for finding failure issues | REST calls, with a bounded number in flight at once | No GraphQL in Gitea. |
 | Octokit retry and throttling plugins | Small retry on network errors, 429 and 5xx, honoring `Retry-After` | A normal response on the tested server had no `Retry-After` or `X-RateLimit-*` header. A 429 was not provoked, so the retry path is untested against a real server. |
 | Permission check skipped under GitHub Actions | Always checks `permissions.push` | Confirmed: a workflow's built-in token gets `permissions` of `push: true` on a repository owned by the `testing` user ([check 10](gitea-api-verification.md#10-gitea-actions)). Always checking works under Actions. |
+| `fail` runs after the same verification as the other steps | `fail` runs without it and falls back to defaults for a bad option or a throwing template | A failed verification is one of the failures to report ([ADR-0008](adr/0008-fail-without-full-verification.md)). |
+| A `(#N)` in a commit subject is not read | A `(#N)` at the end of a subject counts when it is a merged pull request in the release | Gitea adds it to squash commits, and the per-commit lookup misses commits inside merge-commit and rebase pull requests. |
+| `addReleases` rewrites the body from `nextRelease.notes` | Rewrites the body `releaseBodyTemplate` produced | Otherwise a custom `releaseBodyTemplate` would be overwritten. |
 | `issue-parser` `github` preset | Same preset with `hosts: [giteaUrl]` | `#N`, `owner/repo#N` and `/issues/N` URLs parse. Gitea pull request URLs (`/pulls/N`) are not read by the preset, so the plugin does not rely on them ([check 8](gitea-api-verification.md#8-issue-parser-with-the-github-preset)). |
 
 ## Trade-offs and limits
@@ -108,4 +114,5 @@ Four constraints shaped the design.
 - [ADR-0005: Find pull requests with per-commit REST calls](adr/0005-find-pull-requests-with-rest.md)
 - [ADR-0006: Test with fakes by default and a live Gitea on demand](adr/0006-test-strategy.md)
 - [ADR-0007: Publish to npm from GitHub Actions with semantic-release](adr/0007-publish-to-npm.md)
+- [ADR-0008: Open the failure issue without running the full verification](adr/0008-fail-without-full-verification.md)
 - Source followed: [`@semantic-release/github` 12.0.10](https://github.com/semantic-release/github)

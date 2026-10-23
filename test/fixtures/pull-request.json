@@ -1,0 +1,13 @@
+{
+  "source": "synthetic",
+  "giteaVersion": null,
+  "status": 200,
+  "body": {
+    "number": 7,
+    "body": "Closes #12",
+    "state": "closed",
+    "merged": true,
+    "merge_commit_sha": "abc1",
+    "html_url": "https://gitea.example/owner/repo/pulls/7"
+  }
+}

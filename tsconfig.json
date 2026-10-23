@@ -10,6 +10,6 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["index.js", "lib/**/*.js", "lib/**/*.d.ts","test/**/*.mjs"],
+  "include": ["index.js", "lib/**/*.js", "lib/**/*.d.ts", "types/**/*.d.ts", "test/**/*.mjs"],
   "exclude": ["test/spike", "node_modules"]
 }
