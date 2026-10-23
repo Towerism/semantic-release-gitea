@@ -111,7 +111,10 @@ test('the release job turns on provenance and runs one at a time', async () => {
  */
 function unexpectedSecrets(name, text) {
   const allowed = name === 'e2e.yml' ? 'GITEA_E2E_TOKEN' : 'GITHUB_TOKEN';
-  return [...text.matchAll(/secrets\.(\w+)/g)].map((m) => m[1]).filter((secret) => secret !== allowed);
+  const named = [...text.matchAll(/secrets\.(\w+)/g)].map((m) => m[1]).filter((secret) => secret !== allowed);
+  // secrets['NAME'], toJSON(secrets) and a bare secrets would read secrets this check cannot name.
+  const indirect = [...text.matchAll(/\bsecrets\b(?!\.\w)/g)].map(() => 'secrets (read without a plain name)');
+  return [...named, ...indirect];
 }
 
 test('every workflow reads only the secret it is allowed to', async () => {
@@ -129,6 +132,13 @@ test('the secrets check rejects another secret in ci.yml and accepts GITEA_E2E_T
   assert.deepEqual(unexpectedSecrets('e2e.yml', '${{ secrets.GITEA_E2E_TOKEN }}'), []);
   assert.deepEqual(unexpectedSecrets('e2e.yml', '${{ secrets.GITHUB_TOKEN }}'), ['GITHUB_TOKEN']);
   assert.deepEqual(unexpectedSecrets('release.yml', '${{ secrets.GITHUB_TOKEN }}'), []);
+});
+
+test('the secrets check also rejects ways of reading secrets that are not a plain secrets.NAME', () => {
+  for (const text of ["${{ secrets['GITEA_E2E_TOKEN'] }}", '${{ toJSON(secrets) }}', '${{ secrets }}', '${{ secrets[matrix.name] }}']) {
+    assert.notDeepEqual(unexpectedSecrets('e2e.yml', text), [], `e2e.yml should be rejected for: ${text}`);
+    assert.notDeepEqual(unexpectedSecrets('ci.yml', text), [], `ci.yml should be rejected for: ${text}`);
+  }
 });
 
 test('e2e runs on manual dispatch and on pushes to main, and never on pull requests', async () => {
