@@ -1,0 +1,6 @@
+{
+  "source": "synthetic",
+  "giteaVersion": null,
+  "status": 201,
+  "body": { "html_url": "https://gitea.example/owner/repo/issues/12#issuecomment-1", "body": "comment" }
+}

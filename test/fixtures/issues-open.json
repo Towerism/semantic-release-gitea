@@ -1,0 +1,9 @@
+{
+  "source": "synthetic",
+  "giteaVersion": null,
+  "status": 200,
+  "body": [
+    { "number": 3, "body": "An earlier failure.\n\n<!-- semantic-release:gitea -->" },
+    { "number": 2, "body": "A person labelled this by hand." }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "source": "synthetic",
+  "giteaVersion": null,
+  "status": 200,
+  "body": {
+    "number": 12,
+    "body": "The list is empty.",
+    "state": "closed",
+    "html_url": "https://gitea.example/owner/repo/issues/12"
+  }
+}

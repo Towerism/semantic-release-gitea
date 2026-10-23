@@ -33,8 +33,8 @@ test('with E2E_REQUIRED=true and no URL, the end-to-end test fails and names the
   assert.match(output, /GITEA_E2E_URL/);
 });
 
-test('without E2E_REQUIRED and with both variables empty, the end-to-end test is skipped and passes', () => {
+test('without E2E_REQUIRED and with both variables empty, both end-to-end tests are skipped and the file passes', () => {
   const { status, output } = runE2e({ GITEA_E2E_URL: '', GITEA_E2E_TOKEN: '' });
   assert.equal(status, 0);
-  assert.match(output, /skipped 1/);
+  assert.match(output, /skipped 2/);
 });
