@@ -86,6 +86,11 @@ test('publish and addChannel release to a throwaway repository on a real Gitea s
     assert.equal(added.body.body, 'Notes for v1.2.0');
   } finally {
     await rm(cwd, { recursive: true, force: true });
-    if (name.startsWith('sr-e2e-')) await api('DELETE', `/repos/${TEST_USER}/${name}`);
+    if (name.startsWith('sr-e2e-')) {
+      // A cleanup failure must not replace the failure that got us here; say which repository is left.
+      await api('DELETE', `/repos/${TEST_USER}/${name}`).catch((error) => {
+        console.error(`Could not delete the throwaway repository ${name}: ${error.message}`);
+      });
+    }
   }
 });
