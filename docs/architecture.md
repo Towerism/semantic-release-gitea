@@ -21,6 +21,9 @@ lib/
   verify.js         validates options, then checks URL, token, repo access and write permission
   publish.js        creates the release (draft first when there are assets) and uploads assets
   add-channel.js    finds the release for a tag and updates it, or creates it
+  assets.js         turns the `assets` option into readable files with upload names
+  is-prerelease.js  decides the pre-release flag from the branch, for both steps above
+  release-api.js    the releases path and checks on the fields Gitea answers with
   success.js        finds pull requests and issues in the release and comments on them
   fail.js           opens or updates the "release is failing" issue
   client.js         the only module that calls fetch: auth header, retry, errors, pagination

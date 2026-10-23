@@ -2,7 +2,7 @@
 
 A [semantic-release](https://github.com/semantic-release/semantic-release) plugin for projects hosted on a [Gitea](https://about.gitea.com/) server. It will do for Gitea what `@semantic-release/github` does for GitHub: publish a release, then comment on or open issues and pull requests.
 
-**Status: not yet functional.** Only `verifyConditions` is built. It checks your setup and fails the release early when something is wrong. The other four steps, `publish`, `addChannel`, `success` and `fail`, are not implemented and reject with "not implemented", so do not use the plugin in a real release yet. [docs/architecture.md](docs/architecture.md) describes what it will do.
+**Status: not yet functional.** `verifyConditions`, `publish` and `addChannel` are built. They check your setup, create the release on Gitea with its files, and move a release to another channel. The other two steps, `success` and `fail`, are not implemented and reject with "not implemented", so do not use the plugin in a real release yet. [docs/architecture.md](docs/architecture.md) describes what it will do.
 
 ## Usage
 
@@ -31,11 +31,25 @@ Before any release step runs, the plugin reports every problem it finds in one m
 4. The server reports version 28.2.0 or newer (`GET /version`).
 5. The token is accepted, the repository exists and has not been renamed, and the token can push (`GET /repos/{owner}/{repo}`).
 
-A passing check is remembered for the rest of the run, so later steps do not repeat the two requests.
+A passing check is remembered for the rest of the run, so later steps do not repeat the two requests. `publish` and `addChannel` run it first if `verifyConditions` did not, so they never act on an unchecked setup.
+
+## What `publish` and `addChannel` do
+
+`publish` creates the release for the new version. Its name comes from `releaseNameTemplate` and its notes from `releaseBodyTemplate`. Both are lodash templates (`<%= nextRelease.version %>`) that see the whole release context. The tag is the one semantic-release just pushed, and the release is marked as a pre-release when the branch is a pre-release or maintenance branch. Gitea picks the latest release itself, so there is no `make_latest`.
+
+Without `assets`, one request creates the release. With `assets`, `publish` creates it as a draft, uploads each file one at a time, then publishes it, so a server that reacts to the release sees the files already attached. Set `draftRelease` to `true` to leave it as a draft. Everything that can fail without the server (a bad template, finding the files) is checked before the first request, so a mistake there leaves nothing on the server.
+
+`assets` takes the same values as the GitHub plugin: a glob string, an array of globs (a `!` pattern in the array removes files), or an object with a `path` and an optional `name`. The `name` is a template. A `path` that matches several files uploads each under its own file name. Files are sent as the multipart field `attachment`, with up to 10 minutes allowed for each upload. A path that does not exist, or is not a file, is logged and skipped, and the release still goes out. An asset `label` has no equivalent on Gitea, so it is ignored with a warning.
+
+If an upload fails, the draft stays on the server and the log gives its address, so you can delete it. Run the release again only after you have.
+
+`addChannel` runs when a version is added to another channel. It finds the release by tag and updates its name and pre-release flag. It leaves the notes and draft state alone. When there is no release for the tag, it creates one from the release notes.
+
+Both steps return `{ url, name: "Gitea release" }` (and `id` for `publish`), the shape semantic-release hands to other plugins. Templates can read `env`, so a template can print the token into a release. Do not put it in one.
 
 ## Options
 
-Option names follow `@semantic-release/github` where Gitea has an equivalent, so a config can move over with the plugin name and the URL options changed. Only the three URL options and `proxy` matter today. The rest are checked now and used by the steps that are not built yet.
+Option names follow `@semantic-release/github` where Gitea has an equivalent, so a config can move over with the plugin name and the URL options changed. The URL options, `proxy`, `assets`, `draftRelease`, `releaseNameTemplate` and `releaseBodyTemplate` are used today. The rest are checked now and used by the steps that are not built yet.
 
 | Option | Type | Default | Meaning |
 |---|---|---|---|
@@ -43,7 +57,7 @@ Option names follow `@semantic-release/github` where Gitea has an equivalent, so
 | `giteaApiUrl` | string | none | Full API address. Replaces `giteaUrl` plus `giteaApiPrefix`. |
 | `giteaApiPrefix` | string | `GITEA_PREFIX`, else `/api/v1` | Path of the API under `giteaUrl`. |
 | `proxy` | string, `{ host, port }` or `false` | `http_proxy`, then `HTTP_PROXY`, else `false` | Proxy for all requests. Needs the optional `undici` package. |
-| `assets` | array | none | Files to attach to the release: globs, arrays of globs, or objects with a `path`. |
+| `assets` | array | none | Files to attach to the release: globs, arrays of globs, or objects with a `path` and optional `name` (a template). A `label` is ignored. |
 | `successComment` | string or `false` | none | Template for the comment on released issues and pull requests. |
 | `successCommentCondition` | string or `false` | none | Template that decides whether to comment. |
 | `failTitle` | string or `false` | `The automated release is failing 🚨` | Title of the issue opened when a release fails. |
@@ -52,8 +66,8 @@ Option names follow `@semantic-release/github` where Gitea has an equivalent, so
 | `labels` | array or `false` | `["semantic-release"]` | Labels for the failure issue. |
 | `assignees` | array | none | Users to assign to the failure issue. |
 | `releasedLabels` | array or `false` | `released` (plus ` on @channel` for a channel) | Labels added to released issues and pull requests. |
-| `addReleases` | `"top"`, `"bottom"` or `false` | `false` | Whether to list other releases in the release notes. |
-| `draftRelease` | boolean | `false` | Publish the release as a draft. |
+| `addReleases` | `"top"`, `"bottom"` or `false` | `false` | Whether to list other releases in the release notes. Applied by `success`, which is not built yet. |
+| `draftRelease` | boolean | `false` | Leave the release as a draft instead of publishing it. |
 | `releaseBodyTemplate` | string | `<%= nextRelease.notes %>` | Template for the release notes. |
 | `releaseNameTemplate` | string | `<%= nextRelease.name %>` | Template for the release name. |
 | `discussionCategoryName` | `false` | `false` | Not supported. Any other value fails with `EUNSUPPORTEDOPTION`. |
