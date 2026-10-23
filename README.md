@@ -2,7 +2,7 @@
 
 A [semantic-release](https://github.com/semantic-release/semantic-release) plugin for projects hosted on a [Gitea](https://about.gitea.com/) server. It will do for Gitea what `@semantic-release/github` does for GitHub: publish a release, then comment on or open issues and pull requests.
 
-**Status: all five steps are built; the package is not published yet.** `verifyConditions`, `publish`, `addChannel`, `success` and `fail` are implemented and tested against a real Gitea server. Releases stay off until v1 (see the maintainer notes). [docs/architecture.md](docs/architecture.md) describes the design.
+**Status: all five steps are built and tested against a real Gitea server.** `verifyConditions`, `publish`, `addChannel`, `success` and `fail` are implemented. The release workflow publishes the package to npm on every push to `main` (see the maintainer notes). [docs/architecture.md](docs/architecture.md) describes the design.
 
 ## Usage
 
@@ -182,8 +182,8 @@ These steps belong to the repository owner. They are not automated.
 1. First publish. The npm package does not exist yet, so trusted publishing cannot be set up. Publish the placeholder version `0.0.0` once by hand from a logged-in shell with `npm publish`. It exists only to create the package.
 2. Trusted publishing. After the first publish, open the package's settings on npmjs.com and add this repository (`Towerism/semantic-release-gitea`) and the workflow file `release.yml` as a trusted publisher.
 3. No `v0.0.0` tag. Do not tag the placeholder. With no version tags in the repository, semantic-release's first automated release is `1.0.0`.
-4. Turning releases on. The release workflow runs on every push to `main`. Its release job is skipped until you set the repository variable `RELEASES_ENABLED` to `true` (Settings, then Secrets and variables, then Actions, then Variables). Set it when v1 is ready.
-5. Undoing a bad release. npm never lets you reuse a version. Mark it with `npm deprecate semantic-release-gitea@<version> "<reason>"` and ship a fix. Do not delete tags.
+4. Turning releases on. The release workflow runs on every push to `main`. The repository variable `RELEASES_ENABLED` is `true` (Settings, then Secrets and variables, then Actions, then Variables); the release job runs only while it is. The first automatic release is `1.0.0`, because the repository has no version tags.
+5. Undoing a bad release. npm never lets you reuse a version. Mark it with `npm deprecate semantic-release-gitea@<version> "<reason>"` and ship a fix. Do not delete tags, with one exception: if the `vX.Y.Z` tag exists but that version is on neither npm nor GitHub (the publish step failed after the tag was pushed), delete the tag with `git tag -d vX.Y.Z` and `git push origin :refs/tags/vX.Y.Z`, fix the cause, and push again. Left in place, the tag makes the next run see nothing new to release.
 6. End-to-end variable. Set the repository Actions variable `GITEA_E2E_URL` to the address of the test Gitea server (Settings, then Secrets and variables, then Actions, then Variables).
 7. End-to-end secret. Set the repository Actions secret `GITEA_E2E_TOKEN` to a token of the `testing` user with repository and issue scopes. A repository-level secret can be read by any workflow file on any branch, which is acceptable while you are the only collaborator. The variable is not secret: GitHub prints the server address in the step's log.
 8. End-to-end workflow. `e2e.yml` runs on `workflow_dispatch` and on pushes to `main`, not on pull requests. After changing the variable, the secret or the workflow, start it by hand from the Actions tab and check that the log shows the test ran and no repository named `sr-e2e-` remains on the server.

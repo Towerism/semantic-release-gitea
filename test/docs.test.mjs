@@ -24,6 +24,11 @@ test('README maintainer notes cover the first publish, the missing tag and the r
   assert.match(notes, /no `v0\.0\.0` tag/i);
   assert.match(notes, /RELEASES_ENABLED/);
   assert.match(notes, /trusted publishing/i);
+  assert.match(notes, /first automatic release is `1\.0\.0`/i);
+  assert.match(notes, /delete the tag/i);
+  for (const stale of ['stay off', 'not published', 'until you set', 'v1 is ready']) {
+    assert.ok(!readme.toLowerCase().includes(stale), `README should not contain "${stale}"`);
+  }
 });
 
 test('ADR-0007 records the owner decision, the placeholder version and the release switch', async () => {
@@ -34,10 +39,13 @@ test('ADR-0007 records the owner decision, the placeholder version and the relea
   assert.match(adr, /1\.0\.0/);
 });
 
-test('the architecture document says releases are off until v1', async () => {
-  const architecture = await read('docs/architecture.md');
-  assert.match(architecture, /RELEASES_ENABLED/);
-  assert.match(architecture, /off until v1/i);
+test('the architecture document and the release workflow say releases are on', async () => {
+  for (const file of ['docs/architecture.md', '.github/workflows/release.yml']) {
+    const text = await read(file);
+    assert.match(text, /RELEASES_ENABLED/, `${file} should name the release switch`);
+    assert.match(text, /releases are on/i, `${file} should say releases are on`);
+    assert.doesNotMatch(text, /off until v1/i, `${file} should not say releases are off`);
+  }
 });
 
 test('README documents every option, the environment variables, the minimum server version and the Actions token mapping', async () => {
