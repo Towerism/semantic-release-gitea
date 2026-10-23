@@ -1,0 +1,12 @@
+{
+  "source": "synthetic",
+  "giteaVersion": null,
+  "status": 201,
+  "body": {
+    "id": 5,
+    "name": "a.txt",
+    "size": 5,
+    "uuid": "00000000-0000-0000-0000-000000000000",
+    "browser_download_url": "https://gitea.example/attachments/00000000-0000-0000-0000-000000000000"
+  }
+}

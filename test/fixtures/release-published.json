@@ -1,0 +1,17 @@
+{
+  "source": "synthetic",
+  "giteaVersion": null,
+  "status": 200,
+  "body": {
+    "id": 12,
+    "tag_name": "v1.2.0",
+    "target_commitish": "main",
+    "name": "1.2.0",
+    "body": "Release notes",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2026-01-01T00:00:00Z",
+    "html_url": "https://gitea.example/owner/repo/releases/tag/v1.2.0",
+    "assets": []
+  }
+}

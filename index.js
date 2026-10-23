@@ -1,9 +1,12 @@
 /**
  * Entry point of the semantic-release plugin. semantic-release calls these
- * five functions at fixed steps of a release. `verifyConditions` is built; the
- * other four reject until the issues that implement them land.
+ * five functions at fixed steps of a release. `verifyConditions`, `publish` and
+ * `addChannel` are built; `success` and `fail` reject until the issue that
+ * implements them lands.
  */
+import { addChannel as addChannelStep } from './lib/add-channel.js';
 import { PLUGIN_NAME } from './lib/definitions/constants.js';
+import { publish as publishStep } from './lib/publish.js';
 import { resolveConfig } from './lib/resolve-config.js';
 import { verify } from './lib/verify.js';
 
@@ -97,21 +100,26 @@ export async function verifyConditions(pluginConfig, context) {
 }
 
 /**
- * @param {import('./index.js').PluginConfig} _pluginConfig
- * @param {import('./index.js').Context} _context
- * @returns {Promise<unknown>}
+ * Creates the release on Gitea, uploading the `assets` first when there are any.
+ *
+ * @param {import('./index.js').PluginConfig} pluginConfig
+ * @param {import('./index.js').Context} context
+ * @returns {Promise<import('./index.js').ReleaseInfo>}
  */
-export async function publish(_pluginConfig, _context) {
-  return notImplemented('publish');
+export async function publish(pluginConfig, context) {
+  return publishStep(await getVerified(pluginConfig, context), context);
 }
 
 /**
- * @param {import('./index.js').PluginConfig} _pluginConfig
- * @param {import('./index.js').Context} _context
- * @returns {Promise<unknown>}
+ * Updates the release for the tag when a version moves to another channel, or
+ * creates it when there is none.
+ *
+ * @param {import('./index.js').PluginConfig} pluginConfig
+ * @param {import('./index.js').Context} context
+ * @returns {Promise<import('./index.js').ReleaseInfo>}
  */
-export async function addChannel(_pluginConfig, _context) {
-  return notImplemented('addChannel');
+export async function addChannel(pluginConfig, context) {
+  return addChannelStep(await getVerified(pluginConfig, context), context);
 }
 
 /**

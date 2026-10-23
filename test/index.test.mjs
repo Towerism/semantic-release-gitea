@@ -5,14 +5,14 @@ import * as plugin from '../index.js';
 import { fixture, serve } from './support/server.mjs';
 
 const LIFECYCLE = ['addChannel', 'fail', 'publish', 'success', 'verifyConditions'];
-const NOT_YET = ['addChannel', 'fail', 'publish', 'success'];
+const NOT_YET = ['fail', 'success'];
 const TOKEN = 'tok-1234567890abcdef';
 
 test('index.js exports exactly the five lifecycle functions', () => {
   assert.deepEqual(Object.keys(plugin).sort(), LIFECYCLE);
 });
 
-test('the four steps that are not built yet return a promise that rejects as not implemented', async () => {
+test('the two steps that are not built yet return a promise that rejects as not implemented', async () => {
   const functions = /** @type {Record<string, (a: object, b: object) => Promise<unknown>>} */ (
     /** @type {unknown} */ (plugin)
   );

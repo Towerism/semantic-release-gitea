@@ -58,8 +58,18 @@ export interface Context {
   errors?: Error[];
 }
 
+/** What `publish` and `addChannel` report about the release they made or changed. */
+export interface ReleaseInfo {
+  /** Address of the release page on the Gitea server. */
+  url: string;
+  /** Always `Gitea release`, so other plugins can tell this release from their own. */
+  name: string;
+  /** The release's number on Gitea. Only `publish` returns it. */
+  id?: number;
+}
+
 export function verifyConditions(pluginConfig: PluginConfig, context: Context): Promise<void>;
-export function publish(pluginConfig: PluginConfig, context: Context): Promise<unknown>;
-export function addChannel(pluginConfig: PluginConfig, context: Context): Promise<unknown>;
+export function publish(pluginConfig: PluginConfig, context: Context): Promise<ReleaseInfo>;
+export function addChannel(pluginConfig: PluginConfig, context: Context): Promise<ReleaseInfo>;
 export function success(pluginConfig: PluginConfig, context: Context): Promise<void>;
 export function fail(pluginConfig: PluginConfig, context: Context): Promise<void>;
