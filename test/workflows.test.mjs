@@ -87,6 +87,7 @@ test('the release job has the narrow write permissions, full history, Node 24 an
   assert.equal(checkout.with['fetch-depth'], 0);
   const setupNode = job.steps.find((/** @type {{ uses?: string }} */ step) => step.uses?.startsWith('actions/setup-node@'));
   assert.equal(String(setupNode.with['node-version']), '24');
+  assert.equal(setupNode.with.cache, undefined, 'the job that can publish must not restore a shared cache');
   const commands = runCommands(job);
   assert.ok(commands.some((cmd) => cmd.includes('npm --version') && cmd.includes('11.5.1')), 'must check npm is at least 11.5.1');
   assert.ok(commands.includes('npx semantic-release'));
