@@ -4,35 +4,27 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as plugin from '../index.js';
+import { createApi } from './support/gitea-api.mjs';
 
 // End to end, against a real Gitea server (ADR-0006). Runs only when GITEA_E2E_URL and
 // GITEA_E2E_TOKEN are set. The token must belong to the `testing` user. Each run creates a
 // repository named sr-e2e-<milliseconds since epoch>, releases to it, and deletes it.
+// When E2E_REQUIRED is "true" (the e2e.yml workflow sets it), a missing variable fails the
+// test instead of skipping it, so a renamed secret cannot leave CI green with nothing run.
 
 const URL_TEXT = process.env.GITEA_E2E_URL;
 const TOKEN = process.env.GITEA_E2E_TOKEN;
 const TEST_USER = 'testing';
+const missing = [['GITEA_E2E_URL', URL_TEXT], ['GITEA_E2E_TOKEN', TOKEN]].filter(([, value]) => !value).map(([name]) => name);
 
-test('publish and addChannel release to a throwaway repository on a real Gitea server', { skip: !URL_TEXT || !TOKEN }, async () => {
+test('publish and addChannel release to a throwaway repository on a real Gitea server', { skip: missing.length > 0 && process.env.E2E_REQUIRED !== 'true' }, async () => {
+  assert.deepEqual(missing, [], `E2E_REQUIRED is true, but these variables are not set: ${missing.join(', ')}`);
   const base = new URL(/** @type {string} */ (URL_TEXT));
   const local = ['localhost', '127.0.0.1', '[::1]'].includes(base.hostname);
   assert.ok(base.protocol === 'https:' || (base.protocol === 'http:' && local), 'GITEA_E2E_URL must use https (http only for localhost)');
   const root = base.origin;
 
-  /**
-   * @param {string} method
-   * @param {string} path
-   * @param {unknown} [json]
-   */
-  async function api(method, path, json) {
-    const response = await fetch(`${root}/api/v1${path}`, {
-      method,
-      headers: { authorization: `token ${TOKEN}`, ...(json === undefined ? {} : { 'content-type': 'application/json' }) },
-      body: json === undefined ? undefined : JSON.stringify(json),
-    });
-    const text = await response.text();
-    return { status: response.status, body: text ? JSON.parse(text) : null };
-  }
+  const api = createApi({ root, token: /** @type {string} */ (TOKEN) });
 
   const user = await api('GET', '/user');
   assert.equal(user.body?.login, TEST_USER, `the token must belong to the ${TEST_USER} user`);
