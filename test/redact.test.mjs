@@ -17,6 +17,11 @@ test('redact hides the username and password in a URL', () => {
   );
 });
 
+test('redact does not reach across quotes, so JSON text keeps its shape', () => {
+  const json = '{"a":"http://h","b":{"c":"x@y"}}';
+  assert.equal(redact(json, []), json);
+});
+
 test('redact leaves a URL without credentials alone', () => {
   assert.equal(redact('https://git.example/a@b', []), 'https://git.example/a@b');
 });

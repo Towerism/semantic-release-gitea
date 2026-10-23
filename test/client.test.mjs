@@ -283,6 +283,65 @@ test('a network failure hides the token and URL credentials in the message and t
   });
 });
 
+test('an error body that holds a URL and an @ in different values keeps its message and status', () =>
+  withServer(
+    [
+      (_req, res) =>
+        res
+          .writeHead(404, { 'content-type': 'application/json' })
+          .end(JSON.stringify({ message: 'see http://localhost:3000', contact: { email: 'a@b.example' } })),
+    ],
+    async (server) => {
+      const { client } = clientFor(server.url);
+      await assert.rejects(client.request('GET', '/x'), (/** @type {GiteaApiError} */ error) => {
+        assert.ok(error instanceof GiteaApiError, `expected GiteaApiError, got ${error}`);
+        assert.equal(error.status, 404);
+        assert.equal(/** @type {any} */ (error.body).message, 'see http://localhost:3000');
+        assert.equal(/** @type {any} */ (error.body).contact.email, 'a@b.example');
+        return true;
+      });
+    },
+  ));
+
+test('a URL with credentials inside an error body value is hidden', () =>
+  withServer(
+    [(_req, res) => res.writeHead(500, { 'content-type': 'application/json' }).end(JSON.stringify({ message: 'proxy http://user:pw@proxy.example failed' }))],
+    async (server) => {
+      const { client } = clientFor(server.url);
+      await assert.rejects(client.request('POST', '/x', { json: {} }), (/** @type {GiteaApiError} */ error) => {
+        assert.equal(leaks(error, 'pw'), false);
+        assert.match(error.message, /http:\/\/\*\*\*@proxy\.example/);
+        return true;
+      });
+    },
+  ));
+
+/** A response whose body fails to arrive, as when the connection drops midway. */
+function brokenBody() {
+  return /** @type {Response} */ (
+    /** @type {unknown} */ ({
+      status: 200,
+      statusText: 'OK',
+      headers: new Headers(),
+      text: async () => {
+        throw connectionError('ECONNRESET');
+      },
+    })
+  );
+}
+
+test('a body that fails to arrive is a network error: a GET is retried and a POST is not', async () => {
+  const retried = scriptedFetch([brokenBody(), new Response('{"ok":true}', { status: 200 })]);
+  const { client } = clientFor('http://127.0.0.1:1', { fetch: retried.fetch });
+  assert.deepEqual(await client.request('GET', '/x'), { ok: true });
+  assert.equal(retried.calls(), 2);
+
+  const once = scriptedFetch([brokenBody(), new Response('{"id":1}', { status: 201 })]);
+  const { client: poster } = clientFor('http://127.0.0.1:1', { fetch: once.fetch });
+  await assert.rejects(poster.request('POST', '/x', { json: {} }), (/** @type {GiteaApiError} */ error) => error.status === 0);
+  assert.equal(once.calls(), 1);
+});
+
 // --- pagination ------------------------------------------------------------
 
 test('paginate follows the next link through every page and returns all items in order', () =>
@@ -306,6 +365,22 @@ test('paginate refuses a next link to another origin and does not request it', (
         assert.equal(other.requests.length, 0);
       },
     );
+  }));
+
+test('paginate stops with an error when a next link points back at a page it already read', () =>
+  withServer(
+    [(req, res) => res.writeHead(200, { link: `<http://${req.headers.host}${req.url}>; rel="next"` }).end('[{"id":1}]')],
+    async (server) => {
+      const { client } = clientFor(server.url);
+      await assert.rejects(client.paginate('/items'), /loop|again/i);
+      assert.equal(server.requests.length, 1);
+    },
+  ));
+
+test('paginate does not treat rel="nextfoo" as the next page', () =>
+  withServer([(_req, res) => res.writeHead(200, { link: '<http://localhost/x>; rel="nextfoo"' }).end('[{"id":1}]')], async (server) => {
+    const { client } = clientFor(server.url);
+    assert.deepEqual(await client.paginate('/items'), [{ id: 1 }]);
   }));
 
 test('a response without a Link header is the last page', () =>

@@ -58,15 +58,24 @@ async function giteaServer(/** @type {(path: string) => import('./support/server
   return { server, paths };
 }
 
-/** @param {string} url @param {Record<string, string>} [env] */
+let contexts = 0;
+
+/**
+ * The verified results are kept for the whole process, so each test gets a repository URL of its own
+ * (a fragment, which the parser ignores). Without it, two tests whose servers happened to get the same
+ * port would share a stored result.
+ * @param {string} url
+ * @param {Record<string, string>} [env]
+ */
 function contextFor(url, env = {}) {
+  contexts += 1;
   /** @type {string[]} */
   const logged = [];
   return {
     logged,
     context: /** @type {import('../index.js').Context} */ (/** @type {unknown} */ ({
       env: { GITEA_TOKEN: TOKEN, GITEA_URL: url, ...env },
-      options: { repositoryUrl: `${url}/owner/repo.git` },
+      options: { repositoryUrl: `${url}/owner/repo.git#test-${contexts}` },
       logger: { log: (/** @type {string} */ message, /** @type {unknown[]} */ ...values) => void logged.push([message, ...values].join(' ')) },
     })),
   };

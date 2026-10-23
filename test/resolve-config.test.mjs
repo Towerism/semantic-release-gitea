@@ -31,6 +31,11 @@ test('the token comes only from GITEA_TOKEN', () => {
   assert.equal(resolveConfig(withTokenOption, context({ GH_TOKEN: 'x', GITHUB_TOKEN: 'y' })).giteaToken, undefined);
 });
 
+test('whitespace around the token, such as a trailing newline from a secret file, is removed', () => {
+  assert.equal(resolveConfig({}, context({ GITEA_TOKEN: 'abc123\n' })).giteaToken, 'abc123');
+  assert.equal(resolveConfig({}, context({ GITEA_TOKEN: '  ' })).giteaToken, '');
+});
+
 test('the API base is the server URL plus the prefix, without doubled or trailing slashes', () => {
   assert.equal(resolveConfig({ giteaUrl: 'https://git.example/gitea/' }, context()).apiBase, 'https://git.example/gitea/api/v1');
   assert.equal(resolveConfig({ giteaUrl: 'https://git.example', giteaApiPrefix: 'api/v1/' }, context()).apiBase, 'https://git.example/api/v1');
