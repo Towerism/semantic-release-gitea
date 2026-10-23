@@ -1,7 +1,6 @@
-# Releases are off until v1 is ready. To turn them on, set the repository
-# variable RELEASES_ENABLED to "true" (Settings > Secrets and variables >
-# Actions > Variables). Until then the release job is skipped and this
-# workflow only runs lint and test.
+# Releases are on. The release job runs only while the repository variable
+# RELEASES_ENABLED is "true" (Settings > Secrets and variables > Actions >
+# Variables). With any other value, this workflow only runs lint and test.
 name: Release
 
 on:

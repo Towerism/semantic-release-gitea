@@ -98,7 +98,7 @@ Four constraints shaped the design.
 ## Open questions
 
 1. Answered 2026-10-22: the server runs Gitea 28.2.0 and accepts the endpoints in the table above ([verification record](gitea-api-verification.md)). Whether older versions do is still untested.
-2. Package name: ADR-0007 proposes the unscoped `semantic-release-gitea`, free on npm on 2026-10-22. The repository is `Towerism/semantic-release-gitea` on GitHub, and the plugin releases itself with semantic-release. Releases are off until v1: the release job runs only when the repository variable `RELEASES_ENABLED` is `true` (see the amendment in ADR-0007).
+2. Package name: ADR-0007 proposes the unscoped `semantic-release-gitea`, free on npm on 2026-10-22. The repository is `Towerism/semantic-release-gitea` on GitHub, and the plugin releases itself with semantic-release. Releases are on: the release job runs only when the repository variable `RELEASES_ENABLED` is `true`, and it is (see ADR-0007).
 3. Licence: MIT, to match the code this design follows and to allow reuse of its logic with attribution.
 4. Does the "Do not check permissions under CI" exception need a Gitea Actions equivalent? Answered 2026-10-22: no exception is needed. The built-in token returns `permissions` (check 10). It is available as `secrets.GITHUB_TOKEN`, `gitea.token` and `github.token`, and is not set as an environment variable by default (ADR-0004).
 5. Repository URLs on a server installed under a sub-path (`https://host/gitea/owner/repo`) are parsed wrongly by the GitHub plugin's rules; the `ssh://git@host:2222/owner/repo.git` form parses correctly ([check 11](gitea-api-verification.md#11-repository-url-forms)). Derive the base from `giteaUrl` when set, and test the sub-path form in the plugin's own tests.
