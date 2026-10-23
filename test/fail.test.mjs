@@ -222,3 +222,26 @@ test('requests go to the owner and repository that were passed in', async () => 
   await fail(verified, context);
   assert.ok(lines(server.calls).every((line) => line.includes('/repos/o/r/')));
 });
+
+// --- fixes after review -------------------------------------------------------
+
+test('a failCommentCondition written with <%= %> that renders the text false skips', async () => {
+  const server = gitea({ issues: [{ number: 4, body: FAILURE_MARKER }] });
+  const { verified, context } = setup({ config: { failCommentCondition: '<%= issue === undefined %>' }, server });
+  await fail(verified, context);
+  assert.equal(server.calls.filter(({ method }) => method === 'POST').length, 0);
+});
+
+test('the token is hidden in the issue title and in the log line about a failed template', async () => {
+  const { verified, context, server, logged } = setup({ config: { failTitle: `Release failed ${TOKEN}`, failComment: `<% throw new Error("${TOKEN}") %>` } });
+  await fail(verified, context);
+  assert.equal(JSON.stringify(posts(server, ISSUES)[0].options.json).includes(TOKEN), false);
+  assert.equal(JSON.stringify(logged).includes(TOKEN), false);
+});
+
+test('a null entry in the list of open issues is ignored', async () => {
+  const server = gitea({ issues: [/** @type {any} */ (null), { number: 4, body: FAILURE_MARKER }] });
+  const { verified, context } = setup({ server });
+  await fail(verified, context);
+  assert.equal(posts(server, '/repos/o/r/issues/4/comments').length, 1);
+});

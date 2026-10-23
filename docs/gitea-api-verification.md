@@ -155,4 +155,4 @@ Measured on 2026-10-22 by the second test in `test/e2e.test.mjs`, which ran on a
 | Creating a label whose name already exists | **201.** Gitea allows two labels with one name. There is no duplicate error, so the retry on a 4xx in `lib/labels.js` does not trigger for a duplicate. |
 | The open-issue list filtered by a label name that two labels share | **Returned no issues** for an open issue that carries one of them (1 before the second label existed, 0 after). |
 
-The last result matters for finding failure issues. A listing narrowed by label name can miss the failure issue, so the hidden marker in the body is the only reliable test, and the label filter can hide the issue it is meant to find.
+The last result matters for finding failure issues. A listing narrowed by label name can miss the failure issue, so the plugin does not filter by label: it reads every page of open issues and keeps those with the hidden marker in the body. The end-to-end test creates the second label while a failure issue is open, and then checks that the next `fail` still comments on that issue.

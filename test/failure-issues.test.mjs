@@ -9,37 +9,34 @@ const ISSUES = '/repos/o/r/issues';
 /** @param {number} number @param {string | null} body */
 const issue = (number, body) => ({ number, body, title: `issue ${number}` });
 
-test('open issues are listed by type and labels, and only those with the marker are kept, lowest number first', async () => {
+test('open issues are listed by type, and only those with the marker are kept, lowest number first', async () => {
   const { client, calls } = routedClient(() => [
     issue(9, `text\n\n${FAILURE_MARKER}`),
     issue(3, 'labelled the same but written by a person'),
     issue(4, `older failure\n\n${FAILURE_MARKER}`),
     issue(5, null),
   ]);
-  const found = await findFailureIssues(client, 'o', 'r', ['ci']);
+  const found = await findFailureIssues(client, 'o', 'r');
   assert.deepEqual(found.map(({ number }) => number), [4, 9]);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].path, ISSUES);
   assert.equal(calls[0].paged, true);
-  assert.deepEqual(calls[0].options.query, { state: 'open', type: 'issues', labels: 'ci,semantic-release' });
 });
 
-test('the failure label is always asked for, and only once', async () => {
+test('the listing is not narrowed by label, because two labels with one name hide the issue from a label filter', async () => {
   const { client, calls } = routedClient(() => []);
-  await findFailureIssues(client, 'o', 'r', ['semantic-release']);
-  await findFailureIssues(client, 'o', 'r', []);
-  assert.equal(calls[0].options.query.labels, 'semantic-release');
-  assert.equal(calls[1].options.query.labels, 'semantic-release');
+  await findFailureIssues(client, 'o', 'r');
+  assert.deepEqual(calls[0].options.query, { state: 'open', type: 'issues' });
 });
 
-test('the marker decides, so issues the label filter returned wrongly are dropped', async () => {
-  const { client } = routedClient(() => [issue(1, 'unrelated open issue'), issue(2, 'another one')]);
-  assert.deepEqual(await findFailureIssues(client, 'o', 'r', ['ci']), []);
+test('entries that are not issues are ignored', async () => {
+  const { client } = routedClient(() => [null, 'text', { body: FAILURE_MARKER }, issue(2, FAILURE_MARKER)]);
+  assert.deepEqual((await findFailureIssues(client, 'o', 'r')).map(({ number }) => number), [2]);
 });
 
 test('an error from the listing is thrown', async () => {
   const { client } = routedClient(() => {
     throw apiError(500);
   });
-  await assert.rejects(findFailureIssues(client, 'o', 'r', []), /status 500/);
+  await assert.rejects(findFailureIssues(client, 'o', 'r'), /status 500/);
 });

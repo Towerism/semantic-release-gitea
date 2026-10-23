@@ -27,6 +27,8 @@ async function giteaServer({ openIssues = 'one failure issue' } = {}) {
       if (route === 'GET /api/v1/version') answer = fixture('version');
       else if (route === `GET ${API}`) answer = fixture('repo');
       else if (route === `GET ${API}/commits/abc1/pull`) answer = fixture('pull-request');
+      else if (route === `GET ${API}/pulls/9`) answer = inline({ number: 9, body: '', state: 'closed', merged: true, merge_commit_sha: 'not-released', html_url: 'https://gitea.example/owner/repo/pulls/9' });
+      else if (route === `GET ${API}/pulls/9/commits`) answer = fixture('pull-commits');
       else if (route === `GET ${API}/issues/12`) answer = fixture('issue');
       else if (/^POST \/api\/v1\/repos\/owner\/repo\/issues\/\d+\/comments$/.test(route)) answer = fixture('comment-created');
       else if (/^POST \/api\/v1\/repos\/owner\/repo\/issues\/\d+\/labels$/.test(route)) answer = fixture('labels-added');
@@ -88,7 +90,7 @@ test('success sends the requests, paths and bodies Gitea documents for comments,
       'GET /api/v1/repos/owner/repo/commits/abc1/pull',
       'GET /api/v1/repos/owner/repo/commits/def2/pull',
       'GET /api/v1/repos/owner/repo/issues/12',
-      'GET /api/v1/repos/owner/repo/issues?state=open&type=issues&labels=semantic-release',
+      'GET /api/v1/repos/owner/repo/issues?state=open&type=issues',
       'GET /api/v1/repos/owner/repo/labels',
       'GET /api/v1/version',
       'PATCH /api/v1/repos/owner/repo/issues/3',
@@ -118,6 +120,23 @@ test('success sends the requests, paths and bodies Gitea documents for comments,
   }
 });
 
+test('success finds a pull request named by (#N) through its details and its commits, and comments under that number', async () => {
+  const server = await giteaServer();
+  try {
+    const context = contextFor(server.url, { commits: [{ hash: 'ghi3', message: 'fix: handle a retry (#9)' }] });
+    await plugin.success({ releasedLabels: false }, context);
+    const sent = routes(server.requests).filter((route) => /\/(pulls|issues\/9)/.test(route));
+    assert.deepEqual(sent, [
+      'GET /api/v1/repos/owner/repo/pulls/9',
+      'GET /api/v1/repos/owner/repo/pulls/9/commits',
+      'POST /api/v1/repos/owner/repo/issues/9/comments',
+    ].sort());
+    assert.match(JSON.parse(server.requests.find((r) => r.url === `${API}/issues/9/comments`)?.body ?? '{}').body, /PR is included in version 1\.2\.0/);
+  } finally {
+    await server.close();
+  }
+});
+
 test('fail with no open failure issue creates one with the label ids, the title and the marker, and never reads /version', async () => {
   const server = await giteaServer({ openIssues: 'none' });
   try {
@@ -126,7 +145,7 @@ test('fail with no open failure issue creates one with the label ids, the title 
 
     assert.deepEqual(routes(server.requests), [
       'GET /api/v1/repos/owner/repo',
-      'GET /api/v1/repos/owner/repo/issues?state=open&type=issues&labels=semantic-release',
+      'GET /api/v1/repos/owner/repo/issues?state=open&type=issues',
       'GET /api/v1/repos/owner/repo/labels',
       'POST /api/v1/repos/owner/repo/issues',
       'POST /api/v1/repos/owner/repo/labels',
@@ -149,7 +168,7 @@ test('fail with an open failure issue comments on it and creates nothing', async
     await plugin.fail({}, contextFor(server.url, { errors: [new Error('Again')] }));
     assert.deepEqual(routes(server.requests), [
       'GET /api/v1/repos/owner/repo',
-      'GET /api/v1/repos/owner/repo/issues?state=open&type=issues&labels=semantic-release',
+      'GET /api/v1/repos/owner/repo/issues?state=open&type=issues',
       'POST /api/v1/repos/owner/repo/issues/3/comments',
     ]);
     const body = JSON.parse(server.requests[2].body).body;

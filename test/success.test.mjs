@@ -471,3 +471,63 @@ test('forty commits that point at three pull requests are looked up once each, w
   assert.ok(server.peak() <= MAX_IN_FLIGHT, `peak was ${server.peak()}`);
   assert.ok(server.peak() > 1, 'requests should overlap, or the limit is not being tested');
 });
+
+// --- fixes after review -------------------------------------------------------
+
+test('a successCommentCondition written with <%= %> that renders the text false skips that item', async () => {
+  const server = gitea({ pullBySha: { m1: pull(1), m2: pull(2) } });
+  const { verified, context } = setup({ server, config: { successCommentCondition: '<%= issue.number !== 1 %>' }, context: { commits: [commit('m1'), commit('m2')] } });
+  await success(verified, context);
+  assert.deepEqual(commented(server), [2]);
+});
+
+test('a closing keyword for another repository or a pull request address fetches nothing', async () => {
+  const server = gitea({ issues: { 5: issueObject(5) } });
+  const text = 'Closes other/repo#3\nCloses https://git.example/x/y/issues/7\nCloses https://git.example/o/r/pulls/6\nCloses #5';
+  const { verified, context } = setup({ server, context: { commits: [commit('a', text)] } });
+  await success(verified, context);
+  const fetched = server.calls.filter((c) => c.method === 'GET' && /\/issues\/\d+$/.test(c.path)).map((c) => c.path);
+  assert.deepEqual(fetched, [`${R}/issues/5`]);
+});
+
+test('an issue that answers 404 is skipped with a log line that names its number', async () => {
+  const { verified, context, logged } = setup({ context: { commits: [commit('a', 'Closes #13')] } });
+  await success(verified, context);
+  assert.ok(logged.some(([level, message, number]) => level === 'log' && /not found/.test(String(message)) && number === 13));
+});
+
+test('a 404 answer to a comment is logged as an error that names the number', async () => {
+  const server = gitea({ pullBySha: { a: pull(1) }, commentStatus: { 1: 404 } });
+  const { verified, context, logged } = setup({ server, context: { commits: [commit('a')] } });
+  await success(verified, context);
+  assert.ok(logged.some(([level, message, number]) => level === 'error' && /exist/.test(String(message)) && number === 1));
+});
+
+test('an unexpected error while finding issues is collected, and the failure issues are still closed', async () => {
+  const server = gitea({ failureIssues: [{ number: 4, body: FAILURE_MARKER }] });
+  const { verified, context } = setup({ server, context: { commits: [commit('a', /** @type {any} */ (5))] } });
+  await assert.rejects(success(verified, context), isAggregate);
+  assert.equal(server.calls.filter((c) => c.method === 'PATCH' && c.path === `${R}/issues/4`).length, 1);
+});
+
+test('an issue is commented under the number that was asked for, even if the answer lacks one', async () => {
+  const server = gitea({ issues: { 12: { state: 'open' } } });
+  const { verified, context } = setup({ server, context: { commits: [commit('a', 'Closes #12')] } });
+  await success(verified, context);
+  assert.deepEqual(commented(server), [12]);
+});
+
+test('a pull request lookup that answers with nothing is ignored', async () => {
+  const server = gitea({ pulls: { 9: /** @type {any} */ (null) } });
+  const { verified, context } = setup({ server, context: { commits: [commit('a', 'x (#9)')] } });
+  await success(verified, context);
+  assert.deepEqual(commented(server), []);
+});
+
+test('the label names are cleaned of the token before they are created', async () => {
+  const server = gitea({ pullBySha: { m1: pull(1) } });
+  const { verified, context } = setup({ server, config: { releasedLabels: ['<%= env.GITEA_TOKEN %>-x'] }, context: { commits: [commit('m1')] } });
+  await success(verified, context);
+  const created = posts(server, /^\/repos\/o\/r\/labels$/).map((c) => c.options.json.name);
+  assert.deepEqual(created, ['***-x']);
+});

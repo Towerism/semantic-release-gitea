@@ -201,20 +201,15 @@ test('all five steps comment on released pull requests and issues and report a f
 
     // A failed release opens one issue, a second failure comments on it, and the next success closes it.
     const failureIssues = async () => {
-      const list = await api('GET', `${repoPath}/issues?state=open&type=issues&labels=semantic-release&limit=50`);
+      const list = await api('GET', `${repoPath}/issues?state=open&type=issues&limit=50`);
       return list.body.filter((/** @type {{ body: string }} */ i) => i.body.includes('<!-- semantic-release:gitea -->'));
     };
     await plugin.fail(config, context());
     const afterFirst = await failureIssues();
     assert.equal(afterFirst.length, 1, 'the first failure should open one issue');
     assert.match(afterFirst[0].body, /The e2e failure/);
-    await plugin.fail(config, context());
-    const afterSecond = await failureIssues();
-    assert.equal(afterSecond.length, 1, 'the second failure should not open another issue');
-    const failureComments = await api('GET', `${repoPath}/issues/${afterSecond[0].number}/comments`);
-    assert.equal(failureComments.body.length, 1, 'the second failure should add one comment');
 
-    // What Gitea does with the label filter, which the plugin leaves to the marker (docs/gitea-api-verification.md).
+    // What Gitea does with the label filter, which the plugin does not use (docs/gitea-api-verification.md, check 12).
     const countFor = async (/** @type {string} */ labels) => {
       const list = await api('GET', `${repoPath}/issues?state=open&type=issues&labels=${encodeURIComponent(labels)}&limit=50`);
       return list.status === 200 ? list.body.length : `status ${list.status}`;
@@ -226,19 +221,21 @@ test('all five steps comment on released pull requests and issues and report a f
       existingAndUnknown: await countFor('semantic-release,sr-e2e-unknown'),
       existingAndOtherExisting: await countFor('semantic-release,sr-e2e-label'),
     };
+    // Gitea accepts a second label with the same name, and a list filtered by that name then misses the failure
+    // issue. The plugin must still find the issue, so the second failure below has to comment on it.
+    const duplicate = await api('POST', `${repoPath}/labels`, { name: 'semantic-release', color: 'ededed' });
+    measured.duplicateLabel = { createStatus: duplicate.status, openIssuesListedByThatNameAfter: await countFor('semantic-release') };
+
+    await plugin.fail(config, context());
+    const afterSecond = await failureIssues();
+    assert.equal(afterSecond.length, 1, 'the second failure should not open another issue');
+    const failureComments = await api('GET', `${repoPath}/issues/${afterSecond[0].number}/comments`);
+    assert.equal(failureComments.body.length, 1, 'the second failure should add one comment');
+
     await plugin.success(config, context({ commits: [], releases }));
     assert.equal((await failureIssues()).length, 0, 'the next success should close the failure issue');
     const closed = await api('GET', `${repoPath}/issues/${afterSecond[0].number}`);
     assert.equal(closed.body.state, 'closed');
-
-    // Last, because it leaves two labels with one name: what Gitea does when a label is created twice, and what a
-    // listing by that label name then returns for an issue that has one of them.
-    const labelList = await api('GET', `${repoPath}/labels`);
-    const existing = labelList.body.find((/** @type {{ name: string }} */ l) => l.name === 'semantic-release');
-    const probe = await api('POST', `${repoPath}/issues`, { title: 'Probe', labels: [existing.id] });
-    const before = await countFor('semantic-release');
-    const duplicate = await api('POST', `${repoPath}/labels`, { name: 'semantic-release', color: 'ededed' });
-    measured.duplicateLabel = { createStatus: duplicate.status, openIssuesWithTheLabelBefore: before, after: await countFor('semantic-release'), probeStatus: probe.status };
   } finally {
     // Printed even when an assertion above failed, so a failed run still leaves its measurements.
     console.log(`MEASURED ${JSON.stringify(measured)}`);

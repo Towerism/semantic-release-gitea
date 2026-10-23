@@ -32,6 +32,20 @@ test('a task that throws gives its error to its caller and frees its place', asy
   assert.equal(await after, 'ok');
 });
 
+test('a task that throws before it returns a promise frees its place and rejects its caller', async () => {
+  const run = createLimiter(1);
+  const failing = run(
+    /** @type {any} */ (
+      () => {
+        throw new Error('sync boom');
+      }
+    ),
+  );
+  const after = run(async () => 'ok');
+  await assert.rejects(failing, /sync boom/);
+  assert.equal(await after, 'ok');
+});
+
 test('limitClient puts both request and paginate behind the same limit', async () => {
   const { client, peak, calls } = routedClient(() => []);
   const limited = limitClient(client, createLimiter(3));
